@@ -26,6 +26,7 @@
 pub extern crate alloc;
 #[cfg(test)]
 extern crate std;
+pub extern crate collections;
 
 pub use amplify_num as num;
 #[cfg(feature = "hex")]
@@ -64,7 +65,11 @@ pub use confined::{medium_map, medium_set, small_map, small_set, tiny_map, tiny_
 #[cfg(all(feature = "indexmap", feature = "std"))]
 pub use confined::{medium_imap, medium_iset, small_imap, small_iset, tiny_imap, tiny_iset};
 
-mod macro_default;
+mod macros;
+#[doc(hidden)]
+pub mod __private {
+    pub use crate::macros::{Empty, Zero, Zeros};
+}
 
 pub mod array;
 pub use array::*;

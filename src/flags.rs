@@ -705,7 +705,7 @@ mod test {
 
     #[test]
     fn test_zero_pos() {
-        let mut f: FlagVec = crate::none!();
+        let mut f: FlagVec = crate::default!();
         *f.mut_byte_at(0) = 0;
         *f.mut_byte_at(8) = 1;
         assert_eq!(f.into_inner(), crate::tiny_vec![0x00, 0x01])
