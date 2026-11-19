@@ -22,7 +22,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{BitAnd, BitOr, BitXor};
 use std::str::FromStr;
 
-use crate::confinement::TinyVec;
+use confined::TinyVec;
 
 /// A single feature flag, represented by it's number inside feature vector
 pub type FlagNo = u16;

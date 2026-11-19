@@ -25,6 +25,8 @@
 pub extern crate alloc;
 extern crate core;
 
+#[macro_use]
+pub extern crate confined;
 #[cfg(feature = "derive")]
 extern crate amplify_derive;
 #[cfg(feature = "derive")]
@@ -32,7 +34,7 @@ pub use amplify_derive::{Wrapper, WrapperMut, Display, AsAny, From, Getters, Err
 
 #[cfg(feature = "serde")]
 #[macro_use]
-extern crate serde_crate as serde;
+pub extern crate serde;
 
 extern crate amplify_num;
 
