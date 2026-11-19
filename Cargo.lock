@@ -15,6 +15,7 @@ dependencies = [
  "amplify_derive",
  "amplify_num",
  "amplify_syn",
+ "collections-traits",
  "confined",
  "rand",
  "serde",

@@ -19,6 +19,7 @@ exclude = [
 ]
 
 [dependencies]
+collections = { package = "collections-traits", version = "0.1.0", default-features = false }
 confined = { version = "=0.5.0-beta.1", default-features = false }
 amplify_derive = { version = "4.0.1", optional = true }
 amplify_syn = { version = "2.0.1", optional = true }
@@ -48,17 +49,17 @@ all = [
     "hex",
 ]
 default = ["std", "derive", "hex"]
-alloc = ["amplify_num/alloc", "confined/alloc"]
-std = ["alloc", "amplify_num/std", "confined/std", "serde?/std"]
+alloc = ["amplify_num/alloc", "collections/alloc", "confined/alloc"]
+std = ["alloc", "amplify_num/std", "collections/std", "confined/std", "serde?/std"]
 rand = ["dep:rand"]
 c_raw = ["std"]
 hex = ["amplify_num/hex", "confined/hex"]
 proc_attr = ["dep:amplify_syn"]
 derive = ["dep:amplify_derive"]
-indexmap = ["confined/indexmap"]
-hashbrown = ["confined/hashbrown"]
-heapless = ["confined/heapless"]
-ascii = ["confined/ascii"]
+indexmap = ["collections/indexmap", "confined/indexmap"]
+hashbrown = ["collections/hashbrown", "confined/hashbrown"]
+heapless = ["collections/heapless", "confined/heapless"]
+ascii = ["collections/ascii", "confined/ascii"]
 ascii-serde = ["serde", "confined/ascii-serde"]
 stringly_conversions = ["dep:stringly_conversions"]
 serde = ["dep:serde", "amplify_num/serde", "confined/serde"]

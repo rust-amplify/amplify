@@ -49,6 +49,10 @@ pub use proc_attr::ident;
 pub use stringly_conversions;
 
 #[cfg(feature = "alloc")]
+pub use collections::{bmap, bset, deque, heap, list, s};
+#[cfg(feature = "std")]
+pub use collections::{map, set};
+#[cfg(feature = "alloc")]
 pub use confined::{
     medium_blob, medium_deque, medium_heap, medium_list, medium_s, medium_vec, small_blob,
     small_deque, small_heap, small_list, small_s, small_vec, tiny_blob, tiny_deque, tiny_heap,
@@ -60,11 +64,7 @@ pub use confined::{medium_map, medium_set, small_map, small_set, tiny_map, tiny_
 #[cfg(all(feature = "indexmap", feature = "std"))]
 pub use confined::{medium_imap, medium_iset, small_imap, small_iset, tiny_imap, tiny_iset};
 
-#[cfg(feature = "alloc")]
-mod macro_alloc;
 mod macro_default;
-#[cfg(feature = "std")]
-mod macro_std;
 
 pub mod array;
 pub use array::*;
