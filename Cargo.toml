@@ -29,7 +29,6 @@ confined = { version = "0.5.0-beta.1" }
 amplify_derive = { version = "4.0.1", optional = true }
 amplify_syn = { version = "2.0.1", optional = true }
 amplify_num = { version = "0.5.3" }
-amplify_apfloat = { version = "0.3.1", optional = true }
 ascii = "1.1.0"
 rand = { version = "0.9.1", optional = true }
 # This strange naming is a workaround for not being able to define required features for a dependency
@@ -60,19 +59,15 @@ all = [
     "proc_attr",
     "derive",
     "rand",
-    "apfloat",
-    "apfloat_std",
     "indexmap",
     "smallvec",
 ]
 default = ["std", "derive", "hex"]
 std = ["amplify_num/std", "alloc"]
-apfloat_std = ["amplify_apfloat/std"]
 alloc = ["amplify_num/alloc"]
-apfloat_alloc = ["amplify_apfloat/alloc"]
+rand = ["dep:rand"]
 c_raw = ["libc", "std"]
 hex = ["amplify_num/hex"]
-apfloat = ["amplify_apfloat"]
 proc_attr = ["amplify_syn"]
 derive = ["amplify_derive"]
 indexmap = ["dep:indexmap"]
