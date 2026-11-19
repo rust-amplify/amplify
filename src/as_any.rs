@@ -14,7 +14,7 @@
 // If not, see <https://opensource.org/licenses/MIT>.
 
 use core::any::Any;
-#[cfg(feature = "alloc")]
+#[cfg(any(test, feature = "std", feature = "alloc"))]
 use alloc::string::String;
 
 /// Trait `AsAny` allows simple conversion of any type into a generic "thick"
@@ -151,6 +151,7 @@ impl AsAny for String {
 #[cfg(test)]
 mod test {
     use ::core::any::Any;
+    use alloc::string::String;
 
     use super::AsAny;
 
@@ -169,7 +170,10 @@ mod test {
         assert_eq!(1i64.as_any().downcast_ref::<i64>().unwrap(), &1i64);
         assert_eq!(1i128.as_any().downcast_ref::<i128>().unwrap(), &1i128);
         assert_eq!(
-            s!("string").as_any().downcast_ref::<String>().unwrap(),
+            String::from("string")
+                .as_any()
+                .downcast_ref::<String>()
+                .unwrap(),
             &"string"
         );
     }
@@ -182,6 +186,9 @@ mod test {
         assert!(1i32.as_any().downcast_ref::<u32>().is_none());
         assert!(1i64.as_any().downcast_ref::<u64>().is_none());
         assert!(1i128.as_any().downcast_ref::<u128>().is_none());
-        assert!(s!("str").as_any().downcast_ref::<&str>().is_none());
+        assert!(String::from("str")
+            .as_any()
+            .downcast_ref::<&str>()
+            .is_none());
     }
 }

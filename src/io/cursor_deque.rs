@@ -18,7 +18,7 @@ use core::fmt::{self, Debug, Formatter};
 use alloc::collections::VecDeque;
 use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
 
-use crate::traits::{AsDequeMut, AsDequeRef};
+use super::deques::{AsDequeMut, AsDequeRef};
 
 /// A `CursorDeque` wraps an in-memory buffer and provides it with a
 /// [`Seek`] implementation.

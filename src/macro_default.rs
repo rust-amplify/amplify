@@ -14,30 +14,6 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-/// Macro for quick & simple `&str` -> `String` conversion:
-/// ```
-/// #[macro_use]
-/// extern crate amplify;
-///
-/// # fn main() {
-/// enum Error {
-///     Io(String),
-/// }
-///
-/// impl From<std::io::Error> for Error {
-///     fn from(err: std::io::Error) -> Error {
-///         Self::Io(s!("I/O error"))
-///     }
-/// }
-/// # }
-/// ```
-#[macro_export]
-macro_rules! s {
-    ( $str:literal ) => {
-        String::from($str)
-    };
-}
-
 /// This macro allows more semantically-clear code (which can be used especially
 /// with structure initialization), indicating that instead of type value we are
 /// generating no value at all (empty collection or data structure filled with
@@ -45,7 +21,7 @@ macro_rules! s {
 #[macro_export]
 macro_rules! none {
     () => {
-        Default::default()
+        ::core::default::Default::default()
     };
 }
 
@@ -55,7 +31,7 @@ macro_rules! none {
 #[macro_export]
 macro_rules! zero {
     () => {
-        Default::default()
+        ::core::default::Default::default()
     };
 }
 
@@ -65,7 +41,7 @@ macro_rules! zero {
 #[macro_export]
 macro_rules! empty {
     () => {
-        Default::default()
+        ::core::default::Default::default()
     };
 }
 
@@ -73,12 +49,13 @@ macro_rules! empty {
 #[macro_export]
 macro_rules! default {
     () => {
-        Default::default()
+        ::core::default::Default::default()
     };
 }
 
 /// Shorthand for `Dumb::dumb()`
 #[macro_export]
+#[deprecated(note = "this test helper has limited implementations and may be removed")]
 macro_rules! dumb {
     () => {
         $crate::Dumb::dumb()

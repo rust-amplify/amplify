@@ -14,91 +14,80 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-//! Amplifying Rust language capabilities: multiple generic trait
-//! implementations, type wrappers, derive macros.
+//! The umbrella crate for the Rust Amplify family.
 //!
-//! Minimum supported rust compiler version (MSRV): 1.46 (stable channel)
+//! This crate re-exports [`confined`] and [`amplify_num`] and provides a small
+//! set of shared wrappers, arrays, and utilities.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+#![deny(unsafe_code)]
 
-#[cfg(feature = "alloc")]
+#[cfg(any(feature = "alloc", test))]
 pub extern crate alloc;
-extern crate core;
+#[cfg(test)]
+extern crate std;
 
-#[macro_use]
-pub extern crate confined;
+pub use amplify_num as num;
+#[cfg(feature = "hex")]
+pub use amplify_num::hex;
+pub use confined;
+#[cfg(feature = "ascii")]
+pub use confined::ascii;
+
 #[cfg(feature = "derive")]
-extern crate amplify_derive;
+pub use amplify_derive::{Display, Error, From, Getters, Wrapper, WrapperMut};
 #[cfg(feature = "derive")]
-pub use amplify_derive::{Wrapper, WrapperMut, Display, AsAny, From, Getters, Error};
-
-#[cfg(feature = "serde")]
-#[macro_use]
-pub extern crate serde;
-
-extern crate amplify_num;
-
-#[cfg(any(test, feature = "hex"))]
-pub use num::hex;
-
-#[cfg(feature = "stringly_conversions")]
-pub use stringly_conversions;
-#[cfg(feature = "stringly_conversions")]
-pub use stringly_conversions::*;
+#[deprecated(note = "trait upcasting is stable; use `core::any::Any` directly")]
+pub use amplify_derive::AsAny;
 
 #[cfg(feature = "proc_attr")]
 pub use amplify_syn as proc_attr;
 #[cfg(feature = "proc_attr")]
 pub use proc_attr::ident;
 
-pub use ascii;
+#[cfg(feature = "stringly_conversions")]
+pub use stringly_conversions;
 
-#[macro_use]
+#[cfg(feature = "alloc")]
+pub use confined::{
+    medium_blob, medium_deque, medium_heap, medium_list, medium_s, medium_vec, small_blob,
+    small_deque, small_heap, small_list, small_s, small_vec, tiny_blob, tiny_deque, tiny_heap,
+    tiny_list, tiny_s, tiny_vec, medium_bmap, medium_bset, small_bmap, small_bset, tiny_bmap,
+    tiny_bset,
+};
+#[cfg(feature = "std")]
+pub use confined::{medium_map, medium_set, small_map, small_set, tiny_map, tiny_set};
+#[cfg(all(feature = "indexmap", feature = "std"))]
+pub use confined::{medium_imap, medium_iset, small_imap, small_iset, tiny_imap, tiny_iset};
+
+#[cfg(feature = "alloc")]
+mod macro_alloc;
 mod macro_default;
 #[cfg(feature = "std")]
-#[macro_use]
 mod macro_std;
+
+pub mod array;
+pub use array::*;
+pub mod error;
+#[cfg(feature = "std")]
+pub mod flags;
 #[cfg(feature = "alloc")]
-#[macro_use]
-mod macro_alloc;
-
-#[cfg(feature = "std")]
-mod io_util;
+pub mod io;
 pub mod strategy;
+pub mod wrapper;
 
-mod collection;
-pub use collection::*;
+mod as_any;
+mod dumb;
+mod join_split;
+#[deprecated(note = "trait upcasting is stable; use `core::any::Any` directly")]
+pub use as_any::AsAny;
+#[deprecated(note = "this test helper has limited implementations and may be removed")]
+pub use dumb::Dumb;
+#[deprecated(note = "this trait has no implementations in the Amplify family")]
+pub use join_split::JoinSplit;
+pub use strategy::Holder;
+pub use wrapper::{Wrapper, WrapperMut};
 
-#[cfg(feature = "std")]
-mod cursor_deque;
-#[cfg(feature = "std")]
-pub use cursor_deque::CursorDeque;
-#[cfg(feature = "std")]
-mod error;
-mod traits;
-
-#[cfg(feature = "std")]
-pub use error::{IntoMultiError, MultiError};
-pub use traits::*;
-
-pub mod num {
-    //! Custom-sized numeric types
-    //!
-    //! Implementation of various integer types with custom bit dimension.
-    //! These include:
-    //! * large signed and unsigned integers, named *gib int types* (256, 512,
-    //!   1024-bit)
-    //! * custom sub-8 bit unsigned integers, named *small int types (5-, 6-,
-    //!   7-bit)
-    //! * 24-bit signed integer.
-    //!
-    //! The functions here are designed to be fast.
-
-    pub use amplify_num::*;
-    #[cfg(feature = "apfloat")]
-    pub use amplify_apfloat as apfloat;
-}
-
-#[cfg(feature = "std")]
-pub use crate::io_util::{IoError, WriteCounter, ConfinedIo};
-pub use crate::strategy::Holder;
+#[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
+#[allow(unsafe_code)]
+pub mod ffi;

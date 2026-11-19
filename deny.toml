@@ -1,0 +1,27 @@
+[advisories]
+version = 2
+
+[licenses]
+allow = [
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "MIT",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+
+[[bans.skip]]
+name = "syn"
+version = "1.0.109"
+reason = "amplify_derive 4.x has not yet migrated from syn 1"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

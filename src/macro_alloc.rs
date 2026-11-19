@@ -14,6 +14,14 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+/// Macro for quick and simple `&str` to `String` conversion.
+#[macro_export]
+macro_rules! s {
+    ($str:literal) => {
+        $crate::alloc::string::String::from($str)
+    };
+}
+
 /// Macro for creating [`alloc::collections::BTreeMap`] in the same manner as
 /// `vec!` is used for [`Vec`]:
 /// ```

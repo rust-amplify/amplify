@@ -1,37 +1,42 @@
 Change Log
 ==========
 
-5.0.0
------
+5.0.0-beta.2 (Unreleased)
+-------------------------
 
-- Major refactoring of the `confinement` module: introduced `SetCollection` and `PlainCollection`
-  traits
-- Added `replace` and `extend` methods to all confined collections
-- Added `first_entry` and `last_entry` methods to confined `BTreeMap`
-- Consistent access to `iter` and `iter_mut` methods across all confined collections
-- Renamed methods with `_unchecked` suffix to use `_checked` (e.g., `push_checked`)
-- Added `single` constructor and made `with` available to all collections
-- Deprecated legacy macros and some methods in `confinement` module for backward compatibility
-- Fixed `alloc`/`std` macro ambiguity
-- Bumped MSRV to 1.75.0
-- General chore and clippy lint fixes
+- Recast `amplify` as the umbrella crate for `amplify_num` 0.6 and `confined` 0.5.
+- Forward family features without enabling dependency defaults; re-export family macros and
+  preserve the `amplify::num`, `amplify::hex`, and derive-target paths.
+- Move utility APIs into `array`, `error`, `ffi`, `flags`, and `io` modules.
+- Remove `RawArray`, the deprecated `Array::from_slice` returning `Option`, and `from_slice_unsafe`;
+  `Array<u8>::from_slice` now returns `Result`.
+- Deprecate `AsAny`, `Dumb`, `dumb!`, and `JoinSplit`.
+- Fix `ConfinedIo::read` to respect the configured byte limit and count bytes actually read.
+- Bump the MSRV to Rust 1.100.
+
+### Migrating from 4.x
+
+| 4.x path or behavior | 5.0 replacement |
+| --- | --- |
+| `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
+| `amplify::MultiError`, `IntoMultiError` | `amplify::error::{MultiError, IntoMultiError}` |
+| `amplify::FlagVec` | `amplify::flags::FlagVec` |
+| `amplify::TryIntoRawStr`, `TryFromRawStr` | `amplify::ffi::{TryIntoRawStr, TryFromRawStr}` with `c_raw` enabled |
+| `amplify::num::*` | Re-exported directly from `amplify_num` 0.6; align family dependencies to the same version |
+| `Array::from_slice` returning `Option` | Use `Array::copy_from_slice`; for byte arrays, `Array::from_slice` returns `Result` |
+| `RawArray`, `from_slice_unsafe` | Removed; use `ByteArray` or checked slice constructors |
+| `amplify::confinement::*` | Use the `amplify::confined::*` re-export |
 
 4.10.0
 ------
 
 - New `SmallVec` support in confined collections via `smallvec` feature
 - New `IndexSet` and `IndexMap` support in confined collections via `indexmap` feature
-- New `CursorDeque` implementation in `io` module, extending over smart pointers wrapping `VecDeque`
+- Added `CursorDeque` over smart pointers wrapping `VecDeque`
 - New non-failing `first` and `last` methods in confined non-empty collections
 - Updated CI: added support for ubuntu-24.04.arm, macos-15-intel and windows-11-arm runners
 - General chore and clippy lint fixes
 
-4.10.0
-------
-
-- New `CursorDeque` implementation in `io` module, extending over smart pointers wrapping `VecDeque`
-- Updated CI: added support for ubuntu-24.04.arm runners
-- General chore and clippy lint fixes
 
 4.9.0
 -----

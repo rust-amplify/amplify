@@ -23,6 +23,7 @@ use std::ops::{BitAnd, BitOr, BitXor};
 use std::str::FromStr;
 
 use confined::TinyVec;
+use crate::tiny_vec;
 
 /// A single feature flag, represented by it's number inside feature vector
 pub type FlagNo = u16;
@@ -34,8 +35,8 @@ pub struct FlagRef<'a> {
     bit: u8,
 }
 
-/// Bit flag vector. Can hold up to 2^16-1 flags and guaranteed to have length
-/// up to 255 bytes.
+/// Bit flag vector. Can hold up to 2040 flags and is guaranteed to have a
+/// length of at most 255 bytes.
 #[derive(Clone)]
 pub struct FlagVec(TinyVec<u8>);
 
@@ -704,9 +705,9 @@ mod test {
 
     #[test]
     fn test_zero_pos() {
-        let mut f: FlagVec = none!();
+        let mut f: FlagVec = crate::none!();
         *f.mut_byte_at(0) = 0;
         *f.mut_byte_at(8) = 1;
-        assert_eq!(f.into_inner(), tiny_vec![0x00, 0x01])
+        assert_eq!(f.into_inner(), crate::tiny_vec![0x00, 0x01])
     }
 }

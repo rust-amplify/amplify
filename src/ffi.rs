@@ -15,7 +15,7 @@
 
 #![allow(missing_docs, clippy::missing_safety_doc)]
 
-use libc::c_char;
+use core::ffi::c_char;
 use std::ffi::{CStr, CString};
 
 pub trait TryIntoRawStr {

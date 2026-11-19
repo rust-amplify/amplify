@@ -45,7 +45,8 @@ impl io::Write for WriteCounter {
 ///
 /// # Example
 /// ```
-/// use amplify::{IoError, Error, Display, From};
+/// use amplify::io::IoError;
+/// use amplify::{Error, Display, From};
 ///
 /// #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, From, Debug, Display, Error)]
 /// enum Error {
@@ -233,30 +234,55 @@ impl<Io: io::Write, const LIM: usize> io::Write for ConfinedIo<Io, LIM> {
 
 impl<Io: io::Read, const LIM: usize> io::Read for ConfinedIo<Io, LIM> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let len = buf.len();
-        if self.pos + len < LIM {
-            self.pos += len;
-            self.io.read(buf)
-        } else if self.pos >= LIM {
+        if buf.is_empty() {
+            return self.io.read(buf);
+        }
+        let remaining = LIM.saturating_sub(self.pos);
+        if remaining == 0 {
             Err(io::ErrorKind::UnexpectedEof.into())
         } else {
-            let pos = self.pos;
-            self.pos = LIM;
-            self.io.read(&mut buf[..(len - (LIM - pos))])
+            let allowed = buf.len().min(remaining);
+            let read = self.io.read(&mut buf[..allowed])?;
+            self.pos += read;
+            Ok(read)
         }
     }
+}
 
-    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
-        let len = buf.len();
-        if self.pos + len < LIM {
-            self.pos += len;
-            self.io.read_exact(buf)
-        } else if self.pos >= LIM {
-            Err(io::ErrorKind::UnexpectedEof.into())
-        } else {
-            let pos = self.pos;
-            self.pos = LIM;
-            self.io.read_exact(&mut buf[..(len - (LIM - pos))])
-        }
+#[cfg(test)]
+mod tests {
+    use std::io::{Cursor, Read};
+
+    use super::ConfinedIo;
+
+    #[test]
+    fn read_is_limited_and_tracks_transferred_bytes() {
+        let mut io = ConfinedIo::<_, 5>::from(Cursor::new(b"abcdefgh"));
+        let mut buf = [0; 8];
+
+        assert_eq!(io.read(&mut buf).unwrap(), 5);
+        assert_eq!(&buf[..5], b"abcde");
+        assert_eq!(io.pos(), 5);
+        assert_eq!(
+            io.read(&mut buf).unwrap_err().kind(),
+            std::io::ErrorKind::UnexpectedEof
+        );
+    }
+
+    #[test]
+    fn empty_read_at_the_limit_is_ok() {
+        let mut io = ConfinedIo::<_, 1>::from(Cursor::new(b"a"));
+        let mut one = [0];
+        assert_eq!(io.read(&mut one).unwrap(), 1);
+        assert_eq!(io.read(&mut []).unwrap(), 0);
+        assert_eq!(io.pos(), 1);
+    }
+
+    #[test]
+    fn short_read_advances_only_by_transferred_bytes() {
+        let mut io = ConfinedIo::<_, 4>::from(Cursor::new(b"a"));
+        let mut buf = [0; 3];
+        assert_eq!(io.read(&mut buf).unwrap(), 1);
+        assert_eq!(io.pos(), 1);
     }
 }
