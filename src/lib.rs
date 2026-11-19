@@ -72,27 +72,19 @@ pub mod __private {
 }
 
 pub mod array;
-pub use array::*;
 pub mod error;
 #[cfg(feature = "std")]
 pub mod flags;
 #[cfg(feature = "alloc")]
 pub mod io;
 pub mod strategy;
-pub mod wrapper;
-
-mod as_any;
-mod dumb;
-mod join_split;
-#[deprecated(note = "trait upcasting is stable; use `core::any::Any` directly")]
-pub use as_any::AsAny;
-#[deprecated(note = "this test helper has limited implementations and may be removed")]
-pub use dumb::Dumb;
-#[deprecated(note = "this trait has no implementations in the Amplify family")]
-pub use join_split::JoinSplit;
-pub use strategy::Holder;
-pub use wrapper::{Wrapper, WrapperMut};
+pub mod traits;
 
 #[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
-#[allow(unsafe_code)]
-pub mod ffi;
+pub use traits::ffi;
+pub use traits::wrapper;
+
+pub use array::*;
+pub use strategy::Holder;
+#[allow(deprecated)]
+pub use traits::{AsAny, ByteArray, Dumb, JoinSplit, Wrapper, WrapperMut};

@@ -7,7 +7,7 @@ Change Log
 - Recast `amplify` as the umbrella crate for `amplify_num` 0.6 and `confined` 0.5.
 - Forward family features without enabling dependency defaults; re-export family macros and
   preserve the `amplify::num`, `amplify::hex`, and derive-target paths.
-- Move utility APIs into `array`, `error`, `ffi`, `flags`, and `io` modules.
+- Move utility APIs into `array`, `error`, `ffi`, `flags`, `io`, and `traits` modules.
 - Remove `RawArray`, the deprecated `Array::from_slice` returning `Option`, and `from_slice_unsafe`;
   `Array<u8>::from_slice` now returns `Result`.
 - Deprecate `AsAny`, `Dumb`, `dumb!`, and `JoinSplit`.
@@ -19,7 +19,7 @@ Change Log
 | 4.x path or behavior | 5.0 replacement |
 | --- | --- |
 | `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
-| `amplify::MultiError`, `IntoMultiError` | `amplify::error::{MultiError, IntoMultiError}` |
+| `amplify::MultiError`, `IntoMultiError` | `amplify::error::MultiError`, `amplify::traits::IntoMultiError` |
 | `amplify::FlagVec` | `amplify::flags::FlagVec` |
 | `amplify::TryIntoRawStr`, `TryFromRawStr` | `amplify::ffi::{TryIntoRawStr, TryFromRawStr}` with `c_raw` enabled |
 | `amplify::num::*` | Re-exported directly from `amplify_num` 0.6; align family dependencies to the same version |

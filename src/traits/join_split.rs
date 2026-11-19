@@ -16,6 +16,7 @@
 /// Trait for splittable streams and other types, which can be separated into
 /// some two types ([`JoinSplit::A`], [`JoinSplit::B`]), like a reader and
 /// writer streams.
+#[deprecated(note = "this trait has no implementations in the Amplify family")]
 pub trait JoinSplit {
     /// First separable type (like reader)
     type A;

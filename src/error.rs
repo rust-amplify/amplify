@@ -61,16 +61,6 @@ impl<A: Error, B: Error, C: Error> MultiError<A, B, C> {
     }
 }
 
-pub trait IntoMultiError: Error + Sized {
-    fn into_multi_error(self) -> MultiError<Self, Infallible, Infallible>;
-}
-
-impl<E: Error> IntoMultiError for E {
-    fn into_multi_error(self) -> MultiError<Self, Infallible, Infallible> {
-        MultiError::A(self)
-    }
-}
-
 impl<A: Error> MultiError<A, Infallible, Infallible> {
     pub fn from_error(e: impl Into<A>) -> Self {
         Self::A(e.into())

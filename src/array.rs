@@ -677,42 +677,6 @@ pub(crate) mod serde_helpers {
     }
 }
 
-/// Trait which does a blanket implementation for all types wrapping [`Array`]s
-pub trait ByteArray<const LEN: usize>: Sized {
-    /// Constructs a wrapper type around a byte array.
-    fn from_byte_array(val: impl Into<[u8; LEN]>) -> Self;
-
-    /// Constructs a byte array from the slice. Errors if the slice length
-    /// doesn't match `LEN` constant generic.
-    fn from_slice(slice: impl AsRef<[u8]>) -> Result<Self, FromSliceError>;
-
-    /// Constructs a byte array from a slice, panicking if the slice length
-    /// doesn't match the `LEN` constant generic.
-    fn from_slice_checked(slice: impl AsRef<[u8]>) -> Self {
-        Self::from_slice(slice).expect("slice length not matching type requirements")
-    }
-
-    /// Returns a byte array representation stored in the wrapped type.
-    fn to_byte_array(&self) -> [u8; LEN];
-}
-
-impl<Id, const LEN: usize, const REVERSE_STR: bool> ByteArray<LEN> for Id
-where
-    Id: Wrapper<Inner = Array<u8, LEN, REVERSE_STR>>,
-{
-    fn from_byte_array(val: impl Into<[u8; LEN]>) -> Self {
-        Self::from_inner(Array::from_inner(val.into()))
-    }
-
-    fn from_slice(slice: impl AsRef<[u8]>) -> Result<Self, FromSliceError> {
-        Array::try_from(slice.as_ref()).map(Self::from_inner)
-    }
-
-    fn to_byte_array(&self) -> [u8; LEN] {
-        self.as_inner().into_inner()
-    }
-}
-
 #[cfg(all(test, feature = "alloc", feature = "hex"))]
 mod test {
     use std::format;

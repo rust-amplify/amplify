@@ -53,12 +53,13 @@ assert_eq!(bytes.as_slice(), &[1, 2]);
 
 | Path | Contents |
 | --- | --- |
-| `amplify::array` | `Array`, `Bytes*`, and `ByteArray`; array type aliases remain re-exported at the crate root |
+| `amplify::array` | `Array`, `FromSliceError`, and `Bytes*`; array types and aliases remain re-exported at the crate root |
 | `amplify::confined` | Re-export of bounded collection types and traits |
-| `amplify::error` | `MultiError` and related conversions |
+| `amplify::error` | `MultiError` error type |
 | `amplify::flags` | `FlagVec` and flag helpers |
 | `amplify::io` | I/O adapters and deque traits; standard I/O adapters require `std` |
 | `amplify::strategy` | Generic implementation strategy helper `Holder` |
+| `amplify::traits` | `Wrapper`, `WrapperMut`, `ByteArray`, `IntoMultiError`, and compatibility traits |
 | `amplify::wrapper` | `Wrapper` and `WrapperMut` traits, also re-exported at the root |
 | `amplify::ffi` | Raw C string conversions, available with `c_raw` except on `wasm32` |
 
@@ -97,7 +98,7 @@ appropriate `getrandom` backend in their application.
 | 4.x | 5.0 |
 | --- | --- |
 | `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
-| `amplify::MultiError`, `IntoMultiError` | `amplify::error::{MultiError, IntoMultiError}` |
+| `amplify::MultiError`, `IntoMultiError` | `amplify::error::MultiError`, `amplify::traits::IntoMultiError` |
 | `amplify::FlagVec` | `amplify::flags::FlagVec` |
 | Raw C string helpers at the root | `amplify::ffi::*` with `c_raw` enabled |
 | `RawArray` and `from_slice_unsafe` | Removed; use `ByteArray` or checked slice constructors |

@@ -13,6 +13,8 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+#![allow(deprecated)]
+
 use core::any::Any;
 #[cfg(any(test, feature = "std", feature = "alloc"))]
 use alloc::string::String;
@@ -26,7 +28,9 @@ use alloc::string::String;
 /// # Example
 ///
 /// ```
-/// #[macro_use]
+/// #![allow(deprecated)]
+/// # #[cfg(feature = "derive")]
+/// # {
 /// use amplify::AsAny;
 ///
 /// #[derive(AsAny, Copy, Clone, PartialEq, Eq, Debug)]
@@ -56,7 +60,9 @@ use alloc::string::String;
 ///
 /// let p = point_ptr.downcast_ref::<Point>().unwrap();
 /// assert_eq!(p.x, 1)
+/// # }
 /// ```
+#[deprecated(note = "trait upcasting is stable; use `core::any::Any` directly")]
 pub trait AsAny {
     /// Returns thick pointer of `&dyn Any` type, that can be later downcasted
     /// back to a reference of the original type.
