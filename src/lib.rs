@@ -87,4 +87,4 @@ pub use traits::wrapper;
 pub use array::*;
 pub use strategy::Holder;
 #[allow(deprecated)]
-pub use traits::{AsAny, ByteArray, Dumb, JoinSplit, Wrapper, WrapperMut};
+pub use traits::{AsAny, ByteArray, Dumb, Wrapper, WrapperMut};

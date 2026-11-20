@@ -22,7 +22,6 @@ mod error;
 #[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
 #[allow(unsafe_code)]
 pub mod ffi;
-mod join_split;
 pub mod wrapper;
 
 #[allow(deprecated)]
@@ -33,6 +32,4 @@ pub use dumb::Dumb;
 pub use error::IntoMultiError;
 #[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
 pub use ffi::{TryAsStr, TryFromRawStr, TryIntoRawStr, TryIntoString};
-#[allow(deprecated)]
-pub use join_split::JoinSplit;
 pub use wrapper::{Wrapper, WrapperMut};

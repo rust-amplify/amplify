@@ -10,7 +10,9 @@ Change Log
 - Move utility APIs into `array`, `error`, `ffi`, `flags`, `io`, and `traits` modules.
 - Remove `RawArray`, the deprecated `Array::from_slice` returning `Option`, and `from_slice_unsafe`;
   `Array<u8>::from_slice` now returns `Result`.
-- Deprecate `AsAny`, `Dumb`, `dumb!`, and `JoinSplit`.
+- Replace `JoinSplit` with `amplify::io::SplitIo` implemented for `TcpStream`, `UnixStream`,
+  reader/writer tuples, and `IoPair`.
+- Deprecate `AsAny`, `Dumb`, and `dumb!`.
 - Fix `ConfinedIo::read` to respect the configured byte limit and count bytes actually read.
 - Bump the MSRV to Rust 1.100.
 
@@ -19,6 +21,7 @@ Change Log
 | 4.x path or behavior | 5.0 replacement |
 | --- | --- |
 | `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
+| `amplify::JoinSplit` | `amplify::io::SplitIo` with `std` enabled |
 | `amplify::MultiError`, `IntoMultiError` | `amplify::error::MultiError`, `amplify::traits::IntoMultiError` |
 | `amplify::FlagVec` | `amplify::flags::FlagVec` |
 | `amplify::TryIntoRawStr`, `TryFromRawStr` | `amplify::ffi::{TryIntoRawStr, TryFromRawStr}` with `c_raw` enabled |

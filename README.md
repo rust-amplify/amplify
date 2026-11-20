@@ -57,7 +57,7 @@ assert_eq!(bytes.as_slice(), &[1, 2]);
 | `amplify::confined` | Re-export of bounded collection types and traits |
 | `amplify::error` | `MultiError` error type |
 | `amplify::flags` | `FlagVec` and flag helpers |
-| `amplify::io` | I/O adapters and deque traits; standard I/O adapters require `std` |
+| `amplify::io` | I/O adapters, stream splitting (`SplitIo`), and deque traits; standard I/O adapters require `std` |
 | `amplify::strategy` | Generic implementation strategy helper `Holder` |
 | `amplify::traits` | `Wrapper`, `WrapperMut`, `ByteArray`, `IntoMultiError`, and compatibility traits |
 | `amplify::wrapper` | `Wrapper` and `WrapperMut` traits, also re-exported at the root |
@@ -98,6 +98,7 @@ appropriate `getrandom` backend in their application.
 | 4.x | 5.0 |
 | --- | --- |
 | `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
+| `amplify::JoinSplit` | `amplify::io::SplitIo` with `std` enabled |
 | `amplify::MultiError`, `IntoMultiError` | `amplify::error::MultiError`, `amplify::traits::IntoMultiError` |
 | `amplify::FlagVec` | `amplify::flags::FlagVec` |
 | Raw C string helpers at the root | `amplify::ffi::*` with `c_raw` enabled |

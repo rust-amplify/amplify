@@ -61,10 +61,9 @@ fn traits_module_exports_shared_traits_and_root_reexports() {
 
     #[allow(deprecated)]
     {
-        use amplify::traits::{AsAny, Dumb, JoinSplit};
+        use amplify::traits::{AsAny, Dumb};
         let _: fn(&u8) -> &dyn core::any::Any = <u8 as AsAny>::as_any;
         let _: u8 = <u8 as Dumb>::dumb();
-        fn _assert_join_split<T: JoinSplit>() {}
     }
 }
 
@@ -81,8 +80,11 @@ fn io_module_retains_deque_traits_and_std_io_types() {
 
     #[cfg(feature = "std")]
     {
-        use std::io::Write;
-        use amplify::io::{ConfinedIo, CursorDeque, IoError, WriteCounter};
+        use std::io::{Read, Write};
+        use amplify::io::{
+            ConfinedIo, CursorDeque, IoError, IoPair, JoinIoError, SplitIo, SplitIoError,
+            StreamReader, StreamWriter, WriteCounter,
+        };
 
         let mut counter = WriteCounter::default();
         counter.write_all(b"abc").unwrap();
@@ -94,6 +96,19 @@ fn io_module_retains_deque_traits_and_std_io_types() {
 
         let io_err = IoError::from(std::io::ErrorKind::UnexpectedEof);
         assert_eq!(io_err.kind(), std::io::ErrorKind::UnexpectedEof);
+
+        let (pipe_r, pipe_w) = std::io::pipe().unwrap();
+        let (mut r, mut w) = IoPair::new(pipe_r, pipe_w).split().unwrap();
+        w.write_all(b"io").unwrap();
+        let mut out = [0u8; 2];
+        r.read_exact(&mut out).unwrap();
+        assert_eq!(&out, b"io");
+        let _pair = IoPair::join(r, w);
+
+        let _: Option<SplitIoError<std::net::TcpStream>> = None;
+        let _: Option<
+            JoinIoError<StreamReader<std::net::TcpStream>, StreamWriter<std::net::TcpStream>>,
+        > = None;
     }
 }
 
