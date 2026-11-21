@@ -11,9 +11,12 @@ Change Log
 - Remove `RawArray`, the deprecated `Array::from_slice` returning `Option`, and `from_slice_unsafe`;
   `Array<u8>::from_slice` now returns `Result`.
 - Replace `JoinSplit` with `amplify::io::SplitIo` implemented for `TcpStream`, `UnixStream`,
-  reader/writer tuples, and `IoPair`.
+  reader/writer tuples, `IoPair`, `IoCounter`, and `ConfinedIo`.
+- Separate and redesign I/O byte counters (`ReadCounter`, `WriteCounter`, `IoCounter`, `NullIo`)
+  and confined streams (`ConfinedReader`, `ConfinedWriter`, `ConfinedIo`, `ConfinedIoError`,
+  `UnfinishedIoError`, and `Tiny*`/`Small*`/`Medium*`/`Large*`/`NonEmpty*` aliases) with
+  `MIN..=MAX` compile-time bounds and `SplitIo` support.
 - Deprecate `AsAny`, `Dumb`, and `dumb!`.
-- Fix `ConfinedIo::read` to respect the configured byte limit and count bytes actually read.
 - Bump the MSRV to Rust 1.100.
 
 ### Migrating from 4.x

@@ -1,7 +1,7 @@
 // Rust language amplification library providing multiple generic trait
 // implementations, type wrappers, derive macros and other language enhancements
 //
-// Written in 2019-2022 by
+// Written in 2019-2026 by
 //     Dr. Maxim Orlovsky <orlovsky@ubideco.org>
 //     Martin Habovstiak <martin.habovstiak@gmail.com>
 //
@@ -20,26 +20,8 @@ use std::fmt::{Debug, Display, Formatter, self};
 use std::error::Error as StdError;
 use std::hash::{Hash, Hasher};
 
-/// A simple way to count bytes written through [`io::Write`].
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Default, Debug)]
-pub struct WriteCounter {
-    /// Count of bytes which passed through this writer
-    pub count: usize,
-}
-
-impl io::Write for WriteCounter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let len = buf.len();
-        self.count += len;
-        Ok(len)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-/// Copyable & cloneable I/O error type represented by the error kind function.
+/// Cloneable I/O error type preserving the [`io::ErrorKind`] and formatted
+/// details.
 ///
 /// Available only when both `std` and `derive` features are present.
 ///
@@ -153,136 +135,5 @@ impl From<IoError> for io::Error {
             Some(details) => io::Error::new(err.kind, details),
             None => io::Error::from(err.kind),
         }
-    }
-}
-
-/// Errors with [`io::ErrorKind::UnexpectedEof`] on [`io::Read`] and
-/// [`io::Write`] operations if the `LIM` is reached.
-#[derive(Clone, Debug)]
-pub struct ConfinedIo<Io, const LIM: usize> {
-    pos: usize,
-    io: Io,
-}
-
-impl<Io, const LIM: usize> From<Io> for ConfinedIo<Io, LIM> {
-    fn from(io: Io) -> Self {
-        Self { pos: 0, io }
-    }
-}
-
-impl<Io: Default, const LIM: usize> Default for ConfinedIo<Io, LIM> {
-    fn default() -> Self {
-        Self {
-            pos: 0,
-            io: Io::default(),
-        }
-    }
-}
-
-impl<Io, const LIM: usize> ConfinedIo<Io, LIM> {
-    /// Constructs new instance.
-    pub fn new() -> Self
-    where
-        Io: Default,
-    {
-        Self::default()
-    }
-
-    /// Returns current position (number of bytes read or written).
-    pub fn pos(&self) -> usize {
-        self.pos
-    }
-
-    /// Returns reference to the inner I/O type.
-    pub fn as_io(&self) -> &Io {
-        &self.io
-    }
-
-    /// Converts into the inner I/O type.
-    pub fn into_io(self) -> Io {
-        self.io
-    }
-
-    /// Returns clone of the inner I/O type.
-    pub fn to_io(&self) -> Io
-    where
-        Io: Clone,
-    {
-        self.io.clone()
-    }
-
-    /// Checks if the position has reached the limit `LIM`.
-    pub fn is_eof(&self) -> bool {
-        self.pos >= LIM
-    }
-}
-
-impl<Io: io::Write, const LIM: usize> io::Write for ConfinedIo<Io, LIM> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let len = buf.len();
-        if self.pos + len >= LIM {
-            return Err(io::ErrorKind::UnexpectedEof.into());
-        }
-        self.pos += len;
-        self.io.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.io.flush()
-    }
-}
-
-impl<Io: io::Read, const LIM: usize> io::Read for ConfinedIo<Io, LIM> {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if buf.is_empty() {
-            return self.io.read(buf);
-        }
-        let remaining = LIM.saturating_sub(self.pos);
-        if remaining == 0 {
-            Err(io::ErrorKind::UnexpectedEof.into())
-        } else {
-            let allowed = buf.len().min(remaining);
-            let read = self.io.read(&mut buf[..allowed])?;
-            self.pos += read;
-            Ok(read)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::{Cursor, Read};
-
-    use super::ConfinedIo;
-
-    #[test]
-    fn read_is_limited_and_tracks_transferred_bytes() {
-        let mut io = ConfinedIo::<_, 5>::from(Cursor::new(b"abcdefgh"));
-        let mut buf = [0; 8];
-
-        assert_eq!(io.read(&mut buf).unwrap(), 5);
-        assert_eq!(&buf[..5], b"abcde");
-        assert_eq!(io.pos(), 5);
-        assert_eq!(
-            io.read(&mut buf).unwrap_err().kind(),
-            std::io::ErrorKind::UnexpectedEof
-        );
-    }
-
-    #[test]
-    fn empty_read_at_the_limit_is_ok() {
-        let mut io = ConfinedIo::<_, 1>::from(Cursor::new(b"a"));
-        let mut one = [0];
-        assert_eq!(io.read(&mut one).unwrap(), 1);
-        assert_eq!(io.read(&mut []).unwrap(), 0);
-        assert_eq!(io.pos(), 1);
-    }
-
-    #[test]
-    fn short_read_advances_only_by_transferred_bytes() {
-        let mut io = ConfinedIo::<_, 4>::from(Cursor::new(b"a"));
-        let mut buf = [0; 3];
-        assert_eq!(io.read(&mut buf).unwrap(), 1);
-        assert_eq!(io.pos(), 1);
     }
 }

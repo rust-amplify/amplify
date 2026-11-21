@@ -57,7 +57,7 @@ assert_eq!(bytes.as_slice(), &[1, 2]);
 | `amplify::confined` | Re-export of bounded collection types and traits |
 | `amplify::error` | `MultiError` error type |
 | `amplify::flags` | `FlagVec` and flag helpers |
-| `amplify::io` | I/O adapters, stream splitting (`SplitIo`), and deque traits; standard I/O adapters require `std` |
+| `amplify::io` | Byte counters (`ReadCounter`, `WriteCounter`, `IoCounter`), confined streams (`ConfinedReader`, `ConfinedWriter`, `ConfinedIo`), stream splitting (`SplitIo`), and deque traits; standard I/O adapters require `std` |
 | `amplify::strategy` | Generic implementation strategy helper `Holder` |
 | `amplify::traits` | `Wrapper`, `WrapperMut`, `ByteArray`, `IntoMultiError`, and compatibility traits |
 | `amplify::wrapper` | `Wrapper` and `WrapperMut` traits, also re-exported at the root |

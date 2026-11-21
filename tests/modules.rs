@@ -82,29 +82,57 @@ fn io_module_retains_deque_traits_and_std_io_types() {
     {
         use std::io::{Read, Write};
         use amplify::io::{
-            ConfinedIo, CursorDeque, IoError, IoPair, JoinIoError, SplitIo, SplitIoError,
-            StreamReader, StreamWriter, WriteCounter,
+            ConfinedIo, ConfinedIoError, ConfinedReader, ConfinedWriter, CursorDeque, IoCounter,
+            IoError, IoPair, JoinIoError, NullIo, ReadCounter, SmallReader, SplitIo, SplitIoError,
+            StreamReader, StreamWriter, TinyIo, TinyWriter, UnfinishedIoError, WriteCounter,
         };
 
         let mut counter = WriteCounter::default();
         counter.write_all(b"abc").unwrap();
         assert_eq!(counter.count, 3);
+        assert_eq!(counter.count(), 3);
+
+        let mut read_counter = ReadCounter::with(std::io::Cursor::new(b"abcd"));
+        let mut rbuf = [0u8; 2];
+        read_counter.read_exact(&mut rbuf).unwrap();
+        assert_eq!(&rbuf, b"ab");
+        assert_eq!(read_counter.count(), 2);
 
         let cursor = CursorDeque::new(deque);
-        let confined = ConfinedIo::<_, 8>::from(cursor);
-        assert_eq!(confined.pos(), 0);
+        let mut confined = ConfinedIo::<_, 0, 8>::from(cursor);
+        assert_eq!(confined.read_count(), 0);
+        assert_eq!(confined.write_count(), 0);
+        let mut four = [0u8; 4];
+        confined.read_exact(&mut four).unwrap();
+        assert_eq!(four, [1, 2, 3, 4]);
+        assert_eq!(confined.read_count_u8(), 4);
+        let _cursor = confined.release();
 
         let io_err = IoError::from(std::io::ErrorKind::UnexpectedEof);
         assert_eq!(io_err.kind(), std::io::ErrorKind::UnexpectedEof);
 
         let (pipe_r, pipe_w) = std::io::pipe().unwrap();
-        let (mut r, mut w) = IoPair::new(pipe_r, pipe_w).split().unwrap();
+        let counted_pair = IoCounter::from_pair(pipe_r, pipe_w);
+        let confined_pair: TinyIo<_> = ConfinedIo::from(counted_pair);
+        let (mut r, mut w): (ConfinedReader<_, 0, 255>, ConfinedWriter<_, 0, 255>) =
+            confined_pair.split().unwrap();
         w.write_all(b"io").unwrap();
         let mut out = [0u8; 2];
         r.read_exact(&mut out).unwrap();
         assert_eq!(&out, b"io");
-        let _pair = IoPair::join(r, w);
+        let rejoined: TinyIo<IoCounter<IoPair<_, _>>> = SplitIo::join(r, w);
+        assert_eq!(rejoined.counts(), (2, 2));
+        let inner_counted = rejoined.release();
+        assert_eq!(inner_counted.counts(), (2, 2));
 
+        let mut tiny_buf = TinyWriter::vec();
+        tiny_buf.write_all(b"ok").unwrap();
+        assert_eq!(tiny_buf.into_confined().unwrap().as_slice(), b"ok");
+
+        let _: NullIo = NullIo;
+        let _: Option<SmallReader<std::io::Empty>> = None;
+        let _: Option<ConfinedIoError> = None;
+        let _: Option<UnfinishedIoError<TinyWriter>> = None;
         let _: Option<SplitIoError<std::net::TcpStream>> = None;
         let _: Option<
             JoinIoError<StreamReader<std::net::TcpStream>, StreamWriter<std::net::TcpStream>>,
