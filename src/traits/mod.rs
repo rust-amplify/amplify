@@ -1,7 +1,7 @@
 // Rust language amplification library providing multiple generic trait
 // implementations, type wrappers, derive macros and other language enhancements
 //
-// Written in 2019-2020 by
+// Written in 2019-2026 by
 //     Dr. Maxim Orlovsky <orlovsky@ubideco.org>
 //
 // To the extent possible under law, the author(s) have dedicated all
@@ -13,21 +13,23 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
-#[macro_use]
-mod wrapper;
-mod as_any;
-#[cfg(feature = "alloc")]
-mod deques;
-mod dumb;
-mod join_split;
-#[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
-mod raw_str;
+//! Shared traits provided by the crate.
 
-pub use as_any::AsAny;
-#[cfg(feature = "alloc")]
-pub use deques::{AsDequeMut, AsDequeRef};
-pub use join_split::JoinSplit;
-pub use wrapper::{Wrapper, WrapperMut};
-pub use dumb::Dumb;
+mod as_any;
+mod byte_array;
+mod dumb;
+mod error;
 #[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
-pub use raw_str::{TryFromRawStr, TryAsStr, TryIntoRawStr, TryIntoString};
+#[allow(unsafe_code)]
+pub mod ffi;
+pub mod wrapper;
+
+#[allow(deprecated)]
+pub use as_any::AsAny;
+pub use byte_array::ByteArray;
+#[allow(deprecated)]
+pub use dumb::Dumb;
+pub use error::IntoMultiError;
+#[cfg(all(feature = "c_raw", not(target_arch = "wasm32")))]
+pub use ffi::{TryAsStr, TryFromRawStr, TryIntoRawStr, TryIntoString};
+pub use wrapper::{Wrapper, WrapperMut};

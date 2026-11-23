@@ -1,7 +1,7 @@
 [package]
 name = "amplify"
-version = "4.10.0"
-description = "Amplifying Rust language capabilities: multiple generic trait implementations, type wrappers, derive macros"
+version = "5.0.0-beta.2"
+description = "A unified facade for the Rust Amplify crate family"
 authors = [
     "Dr. Maxim Orlovsky <orlovsky@ubideco.org>",
     "Martin Habovstiak <martin.habovstiak@gmail.com>",
@@ -13,45 +13,27 @@ homepage = "https://github.com/rust-amplify"
 license = "MIT"
 readme = "README.md"
 edition = "2021"
-rust-version = "1.75.0" # Due to the use of `impl` in trait return types
+rust-version = "1.100.0"
 exclude = [
     ".github",
-    "derive",
-    "syn",
-    "num",
-    "serde_str_helpers",
-    "stringly_conversions",
 ]
 
 [dependencies]
-libc = { version = "0.2", optional = true }
+collections = { package = "collections-traits", version = "0.1.0", default-features = false }
+confined = { version = "=0.5.0-beta.1", default-features = false }
 amplify_derive = { version = "4.0.1", optional = true }
 amplify_syn = { version = "2.0.1", optional = true }
-amplify_num = { version = "0.5.3" }
-amplify_apfloat = { version = "0.3.1", optional = true }
-ascii = "1.1.0"
+amplify_num = { version = "=0.6.0-beta.1", default-features = false }
 rand = { version = "0.9.1", optional = true }
-# This strange naming is a workaround for not being able to define required features for a dependency
-# See https://github.com/rust-lang/api-guidelines/issues/180 for the explanation and references.
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", default-features = false, features = ["derive"], optional = true }
 stringly_conversions = { version = "0.1.1", optional = true, features = ["alloc"] }
-indexmap = { version = "2.11", optional = true }
-smallvec = { version = "1.13", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-rand = { version = "0.9.1", optional = true }
-getrandom = { version = "0.3", features = ["wasm_js"] }
-getrandom2 = { package = "getrandom", version = "0.2", features = ["js"] }
-
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-wasm-bindgen-test = "0.3"
-
 [features]
 all = [
+    "alloc",
     "serde",
     "std",
     "stringly_conversions",
@@ -59,31 +41,25 @@ all = [
     "proc_attr",
     "derive",
     "rand",
-    "apfloat",
-    "apfloat_std",
     "indexmap",
-    "smallvec",
+    "hashbrown",
+    "heapless",
+    "ascii",
+    "ascii-serde",
+    "hex",
 ]
 default = ["std", "derive", "hex"]
-std = ["amplify_num/std", "alloc"]
-apfloat_std = ["amplify_apfloat/std"]
-alloc = ["amplify_num/alloc"]
-apfloat_alloc = ["amplify_apfloat/alloc"]
-c_raw = ["libc", "std"]
-hex = ["amplify_num/hex"]
-apfloat = ["amplify_apfloat"]
-proc_attr = ["amplify_syn"]
-derive = ["amplify_derive"]
-indexmap = ["dep:indexmap"]
-smallvec = ["dep:smallvec"]
-serde = [
-    "dep:serde",
-    "std",
-    "amplify_num/serde",
-    "ascii/serde",
-    "stringly_conversions",
-    "stringly_conversions/alloc",
-    "stringly_conversions/serde_str_helpers",
-    "indexmap?/serde",
-    "smallvec?/serde",
-]
+alloc = ["amplify_num/alloc", "collections/alloc", "confined/alloc"]
+std = ["alloc", "amplify_num/std", "collections/std", "confined/std", "serde?/std"]
+rand = ["dep:rand"]
+c_raw = ["std"]
+hex = ["amplify_num/hex", "confined/hex"]
+proc_attr = ["dep:amplify_syn"]
+derive = ["dep:amplify_derive"]
+indexmap = ["collections/indexmap", "confined/indexmap"]
+hashbrown = ["collections/hashbrown", "confined/hashbrown"]
+heapless = ["collections/heapless", "confined/heapless"]
+ascii = ["collections/ascii", "confined/ascii"]
+ascii-serde = ["serde", "confined/ascii-serde"]
+stringly_conversions = ["dep:stringly_conversions"]
+serde = ["dep:serde", "amplify_num/serde", "confined/serde"]

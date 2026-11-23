@@ -27,13 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo check --workspace --no-default-features
+      - run: cargo check --workspace --all-targets --no-default-features
   features:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        feature: [ serde, std, alloc, stringly_conversions, rand, smallvec, indexmap, c_raw, proc_attr, hex, apfloat ]
+        feature: [ serde, std, alloc, stringly_conversions, rand, indexmap, hashbrown, heapless, ascii, ascii-serde, c_raw, proc_attr, derive, hex ]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -57,7 +57,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [ nightly, beta, stable, 1.75.0 ]
+        toolchain: [ nightly, beta, stable, 1.100.0 ]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -65,3 +65,19 @@ jobs:
           toolchain: ${{matrix.toolchain}}
       - name: Toolchain ${{matrix.toolchain}}
         run: cargo +${{matrix.toolchain}} check --workspace --all-targets --all-features
+  no-std-target:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi
+      - run: cargo check --target thumbv7em-none-eabi --no-default-features
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - run: cargo check --target wasm32-unknown-unknown

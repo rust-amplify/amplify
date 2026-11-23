@@ -1,15 +1,48 @@
 Change Log
 ==========
 
+5.0.0-beta.2 (Unreleased)
+-------------------------
+
+- Recast `amplify` as the umbrella crate for `amplify_num` 0.6 and `confined` 0.5.
+- Forward family features without enabling dependency defaults; re-export family macros and
+  preserve the `amplify::num`, `amplify::hex`, and derive-target paths.
+- Move utility APIs into `array`, `error`, `ffi`, `flags`, `io`, and `traits` modules.
+- Remove `RawArray`, the deprecated `Array::from_slice` returning `Option`, and `from_slice_unsafe`;
+  `Array<u8>::from_slice` now returns `Result`.
+- Replace `JoinSplit` with `amplify::io::SplitIo` implemented for `TcpStream`, `UnixStream`,
+  reader/writer tuples, `IoPair`, `IoCounter`, and `ConfinedIo`.
+- Separate and redesign I/O byte counters (`ReadCounter`, `WriteCounter`, `IoCounter`, `NullIo`)
+  and confined streams (`ConfinedReader`, `ConfinedWriter`, `ConfinedIo`, `ConfinedIoError`,
+  `UnfinishedIoError`, and `Tiny*`/`Small*`/`Medium*`/`Large*`/`NonEmpty*` aliases) with
+  `MIN..=MAX` compile-time bounds and `SplitIo` support.
+- Deprecate `AsAny`, `Dumb`, and `dumb!`.
+- Bump the MSRV to Rust 1.100.
+
+### Migrating from 4.x
+
+| 4.x path or behavior | 5.0 replacement |
+| --- | --- |
+| `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
+| `amplify::JoinSplit` | `amplify::io::SplitIo` with `std` enabled |
+| `amplify::MultiError`, `IntoMultiError` | `amplify::error::MultiError`, `amplify::traits::IntoMultiError` |
+| `amplify::FlagVec` | `amplify::flags::FlagVec` |
+| `amplify::TryIntoRawStr`, `TryFromRawStr` | `amplify::ffi::{TryIntoRawStr, TryFromRawStr}` with `c_raw` enabled |
+| `amplify::num::*` | Re-exported directly from `amplify_num` 0.6; align family dependencies to the same version |
+| `Array::from_slice` returning `Option` | Use `Array::copy_from_slice`; for byte arrays, `Array::from_slice` returns `Result` |
+| `RawArray`, `from_slice_unsafe` | Removed; use `ByteArray` or checked slice constructors |
+| `amplify::confinement::*` | Use the `amplify::confined::*` re-export |
+
 4.10.0
 ------
 
 - New `SmallVec` support in confined collections via `smallvec` feature
 - New `IndexSet` and `IndexMap` support in confined collections via `indexmap` feature
-- New `CursorDeque` implementation in `io` module, extending over smart pointers wrapping `VecDeque`
+- Added `CursorDeque` over smart pointers wrapping `VecDeque`
 - New non-failing `first` and `last` methods in confined non-empty collections
 - Updated CI: added support for ubuntu-24.04.arm, macos-15-intel and windows-11-arm runners
 - General chore and clippy lint fixes
+
 
 4.9.0
 -----

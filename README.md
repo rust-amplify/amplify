@@ -1,168 +1,117 @@
-# Rust Amplify Library
+<!-- markdownlint-disable MD033 -->
+<div align="center">
 
-![Build](https://github.com/rust-amplify/rust-amplify/workflows/Build/badge.svg)
-![Tests](https://github.com/rust-amplify/rust-amplify/workflows/Tests/badge.svg)
-![Lints](https://github.com/rust-amplify/rust-amplify/workflows/Lints/badge.svg)
-[![codecov](https://codecov.io/gh/rust-amplify/rust-amplify/branch/master/graph/badge.svg)](https://codecov.io/gh/rust-amplify/rust-amplify)
+# `amplify`
 
+**One dependency for the Rust Amplify family.**
+
+[![Build](https://github.com/rust-amplify/rust-amplify/workflows/Build/badge.svg)](https://github.com/rust-amplify/rust-amplify/actions)
+[![Tests](https://github.com/rust-amplify/rust-amplify/workflows/Tests/badge.svg)](https://github.com/rust-amplify/rust-amplify/actions)
 [![crates.io](https://img.shields.io/crates/v/amplify)](https://crates.io/crates/amplify)
 [![Docs](https://docs.rs/amplify/badge.svg)](https://docs.rs/amplify)
-[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-Amplifying Rust language capabilities: multiple generic trait implementations,
-type wrappers, derive macros. Tiny library with zero non-optional dependencies.
-Able to work as `no_std`.
+</div>
 
-Minimum supported rust compiler version (MSRV): 1.75.0; rust edition 2021.
+`amplify` is the facade and shared utility crate for the Rust Amplify family. It
+re-exports the family crates and keeps a small set of wrappers, array types,
+derive targets, and utilities used across them. It is not a zero-dependency
+crate: the facade depends on `amplify_num` and `confined`.
 
-## Main features
+- Rust edition: 2021
+- Minimum supported Rust version: 1.100
+- `no_std` is supported with `--no-default-features`; `alloc` and `std` are
+  independently selectable features.
 
-### Generics
+## The Amplify family
 
-Library proposes **generic implementation strategies**, which allow multiple
-generic trait implementations.
+| Crate | Purpose |
+| --- | --- |
+| [`amplify_num`](https://crates.io/crates/amplify_num) | Bit-sized integers, big integers, and optional hexadecimal conversions |
+| [`confined`](https://crates.io/crates/confined) | Bounded collections and collection traits |
+| `amplify_derive` | Derives for wrappers, formatting, errors, and conversions |
+| `amplify_syn` | Helpers for procedural-macro authors |
+| `amplify` | Family facade and shared utilities |
 
-Implementing trait for a generic type ("blanket implementation") more than once
-(applies both for local and foreign traits) - or implement foreign trait for a
-concrete type where there is some blanket implementation in the upstream. The
-solution is to use special pattern by @Kixunil. I use it widely and have a
-special helper type in [`src/strategy.rs`]()src/strategy.rs module.
-
-With that helper type you can write the following code, which will provide you
-with efficiently multiple blanket implementations of some trait `SampleTrait`:
-
-```rust
-pub trait SampleTrait {
-    fn sample_trait_method(&self);
-}
-
-// Define strategies, one per specific implementation that you need,
-// either blanket or concrete
-pub struct StrategyA;
-
-pub struct StrategyB;
-
-pub struct StrategyC;
-
-// Define a single marker type
-pub trait Strategy {
-    type Strategy;
-}
-
-// Do a single blanket implementation using Holder and Strategy marker trait
-impl<T> SampleTrait for T
-    where
-        T: Strategy + Clone,
-        amplify::Holder<T, <T as Strategy>::Strategy>: SampleTrait,
-{
-    // Do this for each of sample trait methods:
-    fn sample_trait_method(&self) {
-        amplify::Holder::new(self.clone()).sample_trait_method()
-    }
-}
-
-// Do this type of implementation for each of the strategies
-impl<T> SampleTrait for amplify::Holder<T, StrategyA>
-    where
-        T: Strategy,
-{
-    fn sample_trait_method(&self) {
-        /* ... write your implementation-specific code here */
-    }
-}
-
-# pub struct ConcreteTypeA;
-
-// Finally, apply specific implementation strategy to a concrete type
-// (or do it in a blanket generic way) as a marker:
-impl Strategy for ConcreteTypeA {
-    type Strategy = StrategyA;
-}
-```
-
-### Derive macros
-
-- Display
-- From
-- Error
-- Getters
-- AsAny
-- Wrapper
-
-A sample of what can be done with the macros:
+The facade re-exports `amplify_num` as `amplify::num`, its hexadecimal module
+as `amplify::hex`, and `confined` as `amplify::confined`. Family types therefore
+use the same underlying crate versions as the standalone dependencies.
 
 ```rust
-#[derive(From, Error, Display, Debug)]
-#[display(doc_comments)]
-pub enum Error {
-    // You can specify multiple conversions with separate attributes
-    #[from(::std::io::Error)]
-    #[from(IoError)]
-    /// Generic I/O error
-    Io,
+use amplify::{confined, num};
+use amplify::hex::FromHex;
 
-    #[from]
-    // This produces error description referencing debug representation
-    // of the internal error type
-    /// Formatting error: {_0:}
-    Format(::std::fmt::Error),
+let values = amplify::tiny_vec![1u8, 2, 3];
+let length: num::u24 = values.len_u24();
+assert_eq!(length, 3u16.into());
 
-    #[from]
-    /// Some complex error, here are details: {details}
-    WithFields { details: ::std::str::Utf8Error },
-
-    #[display(LowerHex)]
-    MultipleFields {
-        // ...and you can also covert error type
-        #[from(IoErrorUnit)]
-        // rest of parameters must implement `Default`
-        io: IoError,
-
-        #[display(ToHex::to_hex)]
-        details: String,
-    },
-}
+let bytes: confined::TinyBlob = confined::TinyBlob::from_hex("0102").unwrap();
+assert_eq!(bytes.as_slice(), &[1, 2]);
 ```
 
-More information is given in `amplify_derive` crate [README](derive/README.md).
+## Modules and compatibility paths
 
-### Macros
+| Path | Contents |
+| --- | --- |
+| `amplify::array` | `Array`, `FromSliceError`, and `Bytes*`; array types and aliases remain re-exported at the crate root |
+| `amplify::confined` | Re-export of bounded collection types and traits |
+| `amplify::error` | `MultiError` error type |
+| `amplify::flags` | `FlagVec` and flag helpers |
+| `amplify::io` | Byte counters (`ReadCounter`, `WriteCounter`, `IoCounter`), confined streams (`ConfinedReader`, `ConfinedWriter`, `ConfinedIo`), stream splitting (`SplitIo`), and deque traits; standard I/O adapters require `std` |
+| `amplify::strategy` | Generic implementation strategy helper `Holder` |
+| `amplify::traits` | `Wrapper`, `WrapperMut`, `ByteArray`, `IntoMultiError`, and compatibility traits |
+| `amplify::wrapper` | `Wrapper` and `WrapperMut` traits, also re-exported at the root |
+| `amplify::ffi` | Raw C string conversions, available with `c_raw` except on `wasm32` |
 
-- `none!` as an alias for `Default::default()` on collection types and types
-  for which semantics makes it sensible to emphasize that the operation
-  initializes empty structure.
-- `s!` for fast `&str` -> `String` conversions
-- Collection-generating macros:
-    - `map!` & `bmap!` for a rappid `HashMap` and `BTreeMap` creation
-    - `set!` & `bset!` for a rappid `HashSet` and `BTreeSet` creation
-    - `list!` for `LinkedList`
+Derive output relies on the stable paths `amplify::Wrapper`,
+`amplify::WrapperMut`, `amplify::AsAny`, and (when enabled) `amplify::hex`.
+`AsAny` remains available for compatibility but is deprecated in favor of
+`core::any::Any` and trait upcasting.
 
-### Wapper type
+## Features
 
-Wrapper trait helps in creating wrapped rust *newtypes*, Wrapped types are used
-for allowing implemeting foreign traits to foreign types:
-<https://doc.rust-lang.org/stable/rust-by-example/generics/new_types.html>
+Default features are `std`, `derive`, and `hex`.
 
-Trait defines convenient methods for accessing inner data, construct
-and deconstruct newtype. It also serves as a marker trait for newtypes.
+| Feature | Enables |
+| --- | --- |
+| `alloc` | Allocation-backed family collections and constructor macros |
+| `std` | `alloc`, standard-library integrations, and `std` support in family crates |
+| `derive` | Re-export of `amplify_derive` macros |
+| `proc_attr` | Re-export of `amplify_syn` helpers |
+| `hex` | Hexadecimal support in `amplify_num` and `confined` |
+| `serde` | Serde support forwarded to family crates |
+| `ascii` / `ascii-serde` | Optional confined ASCII types and their Serde support |
+| `indexmap`, `hashbrown`, `heapless` | Optional confined collection backends |
+| `rand` | Random byte-array generation |
+| `stringly_conversions` | Re-export of the optional `stringly_conversions` crate |
+| `c_raw` | Standard-library C string conversion helpers in `amplify::ffi` |
 
-The trait works well with `#[derive(Wrapper)]` from `amplify_derive` crate
+`serde` does not implicitly enable `std`; enable `alloc` when using Serde with
+allocation-backed values. `rand` users targeting WebAssembly must select the
+appropriate `getrandom` backend in their application.
 
-## Build
+## 4.x to 5.0 migration
 
-```shell script
-cargo build --all
-cargo test
-```
+5.0 intentionally changes APIs while adopting the new `amplify_num` and
+`confined` releases. Several utility types are now module-only:
 
-As a reminder, minimum supported rust compiler version (MSRV) is 1.36.0, so it
-can be build with either nightly, dev, stable or 1.36+ version of the rust
-compiler. Use `rustup` for getting the proper version, or add `+toolchain`
-parameter to both `cargo build` and `cargo test` commands.
+| 4.x | 5.0 |
+| --- | --- |
+| `amplify::IoError`, `WriteCounter`, `ConfinedIo`, `CursorDeque` | `amplify::io::{IoError, WriteCounter, ConfinedIo, CursorDeque}` |
+| `amplify::JoinSplit` | `amplify::io::SplitIo` with `std` enabled |
+| `amplify::MultiError`, `IntoMultiError` | `amplify::error::MultiError`, `amplify::traits::IntoMultiError` |
+| `amplify::FlagVec` | `amplify::flags::FlagVec` |
+| Raw C string helpers at the root | `amplify::ffi::*` with `c_raw` enabled |
+| `RawArray` and `from_slice_unsafe` | Removed; use `ByteArray` or checked slice constructors |
+| Generic `Array::from_slice` returning `Option` | Use `Array::copy_from_slice`; byte arrays now have `Array::from_slice` returning `Result` |
+| `amplify::confinement` | Use `amplify::confined` |
 
-## Benchmark
+The `smallvec` feature has been removed. Use the collection backends provided
+by `confined` (`indexmap`, `hashbrown`, or `heapless`) where appropriate.
 
-```shell
-RUSTFLAGS="--cfg bench" cargo bench
+## Build and test
+
+```sh
+cargo test --all-features
+cargo check --all-targets --no-default-features
 ```

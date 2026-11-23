@@ -13,8 +13,10 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+#![allow(deprecated)]
+
 use core::any::Any;
-#[cfg(feature = "alloc")]
+#[cfg(any(test, feature = "std", feature = "alloc"))]
 use alloc::string::String;
 
 /// Trait `AsAny` allows simple conversion of any type into a generic "thick"
@@ -26,7 +28,9 @@ use alloc::string::String;
 /// # Example
 ///
 /// ```
-/// #[macro_use]
+/// #![allow(deprecated)]
+/// # #[cfg(feature = "derive")]
+/// # {
 /// use amplify::AsAny;
 ///
 /// #[derive(AsAny, Copy, Clone, PartialEq, Eq, Debug)]
@@ -56,7 +60,9 @@ use alloc::string::String;
 ///
 /// let p = point_ptr.downcast_ref::<Point>().unwrap();
 /// assert_eq!(p.x, 1)
+/// # }
 /// ```
+#[deprecated(note = "trait upcasting is stable; use `core::any::Any` directly")]
 pub trait AsAny {
     /// Returns thick pointer of `&dyn Any` type, that can be later downcasted
     /// back to a reference of the original type.
@@ -151,6 +157,7 @@ impl AsAny for String {
 #[cfg(test)]
 mod test {
     use ::core::any::Any;
+    use alloc::string::String;
 
     use super::AsAny;
 
@@ -169,7 +176,10 @@ mod test {
         assert_eq!(1i64.as_any().downcast_ref::<i64>().unwrap(), &1i64);
         assert_eq!(1i128.as_any().downcast_ref::<i128>().unwrap(), &1i128);
         assert_eq!(
-            s!("string").as_any().downcast_ref::<String>().unwrap(),
+            String::from("string")
+                .as_any()
+                .downcast_ref::<String>()
+                .unwrap(),
             &"string"
         );
     }
@@ -182,6 +192,9 @@ mod test {
         assert!(1i32.as_any().downcast_ref::<u32>().is_none());
         assert!(1i64.as_any().downcast_ref::<u64>().is_none());
         assert!(1i128.as_any().downcast_ref::<u128>().is_none());
-        assert!(s!("str").as_any().downcast_ref::<&str>().is_none());
+        assert!(String::from("str")
+            .as_any()
+            .downcast_ref::<&str>()
+            .is_none());
     }
 }

@@ -13,10 +13,13 @@
 // along with this software.
 // If not, see <https://opensource.org/licenses/MIT>.
 
+#![allow(deprecated)]
+
 use crate::{Array, Wrapper};
 
 /// Used as an alternative to default for test and prototyping purposes, when a
 /// type can't have a default value, but you need to generate some dumb data.
+#[deprecated(note = "this test helper has limited implementations and may be removed")]
 pub trait Dumb
 where
     Self: Sized,
