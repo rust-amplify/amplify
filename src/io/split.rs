@@ -545,7 +545,7 @@ impl<R: io::Read, W: io::Write> SplitIo for IoPair<R, W> {
 
 #[cfg(test)]
 mod test {
-    use std::io::{BufRead, Cursor, Read, Write};
+    use std::io::{BufRead, Cursor, IoSlice, IoSliceMut, Read, Write};
     use std::net::TcpListener;
     use std::thread;
 
@@ -699,10 +699,11 @@ mod test {
 
         let _stdio = IoPair::stdio();
 
-        let split_err = SplitIoError {
-            original: 42u8,
-            error: io::Error::from(io::ErrorKind::Other),
-        };
+        let (ok_r, ok_w) = split_cloned(41u8, Ok(42u8)).unwrap();
+        assert_eq!((*ok_r.as_stream(), *ok_w.as_stream()), (42u8, 41u8));
+        let split_err = split_cloned(42u8, Err(io::Error::other("dup failed"))).unwrap_err();
+        assert_eq!(split_err.original, 42u8);
+        assert_eq!(split_err.to_string(), "dup failed");
         assert!(split_err.source().is_some());
         let io_err: io::Error = split_err.into();
         assert_eq!(io_err.kind(), io::ErrorKind::Other);
@@ -713,6 +714,92 @@ mod test {
         };
         let io_err: io::Error = join_err.into();
         assert_eq!(io_err.kind(), io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn stream_halves_and_io_pair_forward_all_io_and_fd_methods() {
+        let (client, mut server) = connected_tcp_pair();
+        let (mut reader, mut writer) = client.split().unwrap();
+        assert!(!format!("{reader:?}").is_empty());
+        assert!(!format!("{writer:?}").is_empty());
+        assert_eq!(
+            reader.as_ref().local_addr().unwrap(),
+            writer.as_stream().local_addr().unwrap()
+        );
+        #[cfg(any(unix, target_os = "wasi"))]
+        {
+            assert!(reader.as_fd().as_raw_fd() >= 0);
+            assert!(writer.as_fd().as_raw_fd() >= 0);
+        }
+
+        let server_thread = thread::spawn(move || {
+            let mut buf = [0u8; 13];
+            server.read_exact(&mut buf).unwrap();
+            assert_eq!(&buf, b"hello world 7");
+            server.write_all(b"abcdUTF8!").unwrap();
+            // Drop server to signal EOF for read_to_end / read_to_string.
+        });
+
+        assert_eq!(writer.write(b"he").unwrap(), 2);
+        assert_eq!(
+            writer
+                .write_vectored(&[IoSlice::new(b"llo "), IoSlice::new(b"world ")])
+                .unwrap(),
+            10
+        );
+        write!(writer, "{}", 7).unwrap();
+        writer.flush().unwrap();
+
+        let mut one = [0u8; 1];
+        assert_eq!(reader.read(&mut one).unwrap(), 1);
+        assert_eq!(&one, b"a");
+        let mut two = [0u8; 2];
+        let mut rest_one = [0u8; 1];
+        let n = reader
+            .read_vectored(&mut [IoSliceMut::new(&mut two), IoSliceMut::new(&mut rest_one)])
+            .unwrap();
+        assert_eq!(n, 3);
+        assert_eq!(&two, b"bc");
+        assert_eq!(&rest_one, b"d");
+
+        let mut text = String::new();
+        reader.read_to_string(&mut text).unwrap();
+        assert_eq!(text, "UTF8!");
+        let mut empty_end = Vec::new();
+        assert_eq!(reader.read_to_end(&mut empty_end).unwrap(), 0);
+
+        server_thread.join().unwrap();
+
+        let mut pair = IoPair::new(Cursor::new(b"12345678".to_vec()), Vec::<u8>::new());
+        pair.as_reader_mut().set_position(1);
+        pair.as_writer_mut().push(b'[');
+        let mut p1 = [0u8; 1];
+        assert_eq!(pair.read(&mut p1).unwrap(), 1);
+        assert_eq!(&p1, b"2");
+        let mut p2 = [0u8; 2];
+        assert_eq!(
+            pair.read_vectored(&mut [IoSliceMut::new(&mut p2)]).unwrap(),
+            2
+        );
+        assert_eq!(&p2, b"34");
+        let mut pstr = String::new();
+        pair.read_to_string(&mut pstr).unwrap();
+        assert_eq!(pstr, "5678");
+        pair.as_reader_mut().set_position(6);
+        let mut pend = Vec::new();
+        pair.read_to_end(&mut pend).unwrap();
+        assert_eq!(pend, b"78");
+
+        assert_eq!(pair.write(b"a").unwrap(), 1);
+        assert_eq!(
+            pair.write_vectored(&[IoSlice::new(b"b"), IoSlice::new(b"c")])
+                .unwrap(),
+            2
+        );
+        write!(pair, "{}", 9).unwrap();
+        pair.flush().unwrap();
+        let (_, out): (_, Vec<u8>) = pair.into();
+        assert_eq!(out, b"[abc9");
     }
 
     #[test]
@@ -754,10 +841,10 @@ mod test {
         }
 
         let stream = NonDebugStream(NonDebugReader, NonDebugWriter);
-        let (r, w) = match stream.split() {
-            Ok(parts) => parts,
-            Err(_) => unreachable!(),
-        };
+        let (mut r, mut w) = stream.split().ok().unwrap();
+        assert_eq!(r.read(&mut [0u8; 2]).unwrap(), 0);
+        assert_eq!(w.write(b"ok").unwrap(), 2);
+        w.flush().unwrap();
         let _rejoined = NonDebugStream::join(r, w);
     }
 }

@@ -129,14 +129,31 @@ fn io_module_retains_deque_traits_and_std_io_types() {
         tiny_buf.write_all(b"ok").unwrap();
         assert_eq!(tiny_buf.into_confined().unwrap().as_slice(), b"ok");
 
-        let _: NullIo = NullIo;
-        let _: Option<SmallReader<std::io::Empty>> = None;
-        let _: Option<ConfinedIoError> = None;
-        let _: Option<UnfinishedIoError<TinyWriter>> = None;
-        let _: Option<SplitIoError<std::net::TcpStream>> = None;
-        let _: Option<
-            JoinIoError<StreamReader<std::net::TcpStream>, StreamWriter<std::net::TcpStream>>,
-        > = None;
+        let mut small_r = SmallReader::new(NullIo);
+        assert_eq!(small_r.read(&mut [0u8; 1]).unwrap(), 0);
+        let under: UnfinishedIoError<_> = ConfinedReader::<_, 1, 4>::new(NullIo)
+            .try_release()
+            .unwrap_err();
+        let conf_err: ConfinedIoError = under.into();
+        assert_eq!(conf_err, ConfinedIoError::Undersize { count: 0, min: 1 });
+
+        let (u_a, u_b) = std::net::TcpListener::bind("127.0.0.1:0")
+            .and_then(|l| {
+                let c = std::net::TcpStream::connect(l.local_addr()?)?;
+                let (s, _) = l.accept()?;
+                Ok((c, s))
+            })
+            .unwrap();
+        let (r1, w1): (StreamReader<_>, StreamWriter<_>) = u_a.split().unwrap();
+        let (r2, w2) = u_b.split().unwrap();
+        let join_err: JoinIoError<_, _> = std::net::TcpStream::try_join(r1, w2).unwrap_err();
+        let _ = std::net::TcpStream::join(join_err.reader, w1);
+        let _ = std::net::TcpStream::join(r2, join_err.writer);
+        let split_err = SplitIoError {
+            original: NullIo,
+            error: std::io::Error::from(std::io::ErrorKind::Other),
+        };
+        assert_eq!(split_err.original, NullIo);
     }
 }
 

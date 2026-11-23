@@ -344,15 +344,6 @@ impl<const MIN: usize, const MAX: usize> ConfinedWriter<Vec<u8>, MIN, MAX> {
             });
         }
         let len = self.writer.len();
-        if len < MIN {
-            return Err(UnfinishedIoError {
-                stream: self,
-                error: ConfinedIoError::Undersize {
-                    count: len,
-                    min: MIN,
-                },
-            });
-        }
         if len > MAX {
             return Err(UnfinishedIoError {
                 stream: self,
@@ -411,25 +402,24 @@ impl<W: io::Write, const MIN: usize, const MAX: usize> io::Write for ConfinedWri
     }
 
     fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        let Some(total) = bufs
-            .iter()
-            .try_fold(0usize, |acc, s| acc.checked_add(s.len()))
-        else {
-            return Err(ConfinedIoError::Oversize {
-                count: usize::MAX,
-                max: MAX,
+        let remaining = MAX - self.count;
+        let mut total = 0usize;
+        for slice in bufs {
+            let len = slice.len();
+            if len > remaining - total {
+                let attempted = bufs
+                    .iter()
+                    .fold(self.count, |acc, s| acc.saturating_add(s.len()));
+                return Err(ConfinedIoError::Oversize {
+                    count: attempted,
+                    max: MAX,
+                }
+                .into());
             }
-            .into());
-        };
+            total += len;
+        }
         if total == 0 {
             return Ok(0);
-        }
-        if total > MAX - self.count {
-            return Err(ConfinedIoError::Oversize {
-                count: self.count.saturating_add(total),
-                max: MAX,
-            }
-            .into());
         }
         let written = self.writer.write_vectored(bufs)?;
         if written > total {

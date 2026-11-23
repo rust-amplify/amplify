@@ -460,8 +460,8 @@ mod test {
 
         // Verify it's still fragmented if it didn't reallocate
         let (_s1, _s2) = inner.as_slices();
-        // Depending on VecDeque implementation, it might have reallocated or not.
-        // But our code should handle it either way.
+        // Depending on VecDeque implementation, it might have reallocated or
+        // not. But our code should handle it either way.
         // Let's check reading again with this inner
         let mut cursor = CursorDeque::new(inner);
         let mut buf = [0u8; 4];

@@ -116,7 +116,7 @@ impl<
     }
 
     #[inline]
-    const fn from_raw_parts(stream: S, read_count: usize, write_count: usize) -> Self {
+    pub(super) const fn from_raw_parts(stream: S, read_count: usize, write_count: usize) -> Self {
         let () = Self::ASSERT_BOUNDS;
         assert!(
             read_count <= READ_MAX,

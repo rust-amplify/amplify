@@ -277,12 +277,9 @@ impl<R: io::Read> io::Read for ReadCounter<R> {
     }
 
     fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
-        let total = bufs
-            .iter()
-            .try_fold(0usize, |acc, s| acc.checked_add(s.len()));
-        if total == Some(0) {
+        let Some(first_idx) = bufs.iter().position(|s| !s.is_empty()) else {
             return self.read(&mut []);
-        }
+        };
         let remaining = usize::MAX - self.count;
         if remaining == 0 {
             return Err(io::Error::new(
@@ -290,25 +287,21 @@ impl<R: io::Read> io::Read for ReadCounter<R> {
                 "read byte counter overflow",
             ));
         }
-        if let Some(total) = total {
-            if total <= remaining {
-                let read = self.reader.read_vectored(bufs)?;
-                if read > total {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "inner reader reported more bytes than vectored buffer capacity",
-                    ));
-                }
-                self.count += read;
-                return Ok(read);
+        let total = bufs[first_idx..]
+            .iter()
+            .fold(0usize, |acc, s| acc.saturating_add(s.len()));
+        if total <= remaining {
+            let read = self.reader.read_vectored(bufs)?;
+            if read > total {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "inner reader reported more bytes than vectored buffer capacity",
+                ));
             }
+            self.count += read;
+            return Ok(read);
         }
-        for slice in bufs {
-            if !slice.is_empty() {
-                return self.read(slice);
-            }
-        }
-        Ok(0)
+        self.read(&mut bufs[first_idx])
     }
 }
 
@@ -517,12 +510,9 @@ impl<W: io::Write> io::Write for WriteCounter<W> {
     }
 
     fn write_vectored(&mut self, bufs: &[io::IoSlice<'_>]) -> io::Result<usize> {
-        let total = bufs
-            .iter()
-            .try_fold(0usize, |acc, s| acc.checked_add(s.len()));
-        if total == Some(0) {
+        let Some(first_idx) = bufs.iter().position(|s| !s.is_empty()) else {
             return self.write(&[]);
-        }
+        };
         let remaining = usize::MAX - self.count;
         if remaining == 0 {
             return Err(io::Error::new(
@@ -530,25 +520,21 @@ impl<W: io::Write> io::Write for WriteCounter<W> {
                 "write byte counter overflow",
             ));
         }
-        if let Some(total) = total {
-            if total <= remaining {
-                let written = self.writer.write_vectored(bufs)?;
-                if written > total {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "inner writer reported more bytes than vectored buffer length",
-                    ));
-                }
-                self.count += written;
-                return Ok(written);
+        let total = bufs[first_idx..]
+            .iter()
+            .fold(0usize, |acc, s| acc.saturating_add(s.len()));
+        if total <= remaining {
+            let written = self.writer.write_vectored(bufs)?;
+            if written > total {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "inner writer reported more bytes than vectored buffer length",
+                ));
             }
+            self.count += written;
+            return Ok(written);
         }
-        for slice in bufs {
-            if !slice.is_empty() {
-                return self.write(slice);
-            }
-        }
-        Ok(0)
+        self.write(&bufs[first_idx])
     }
 
     #[inline]
@@ -929,6 +915,7 @@ impl<S: AsRawSocket> AsRawSocket for IoCounter<S> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::io::{BufRead, Cursor, IoSlice, IoSliceMut, Read, Seek, SeekFrom, Write};
     use std::net::{TcpListener, TcpStream};
     use std::thread;
@@ -990,9 +977,17 @@ mod tests {
 
     #[test]
     fn null_io_semantics_and_split() {
-        let mut null = NullIo;
+        fn make_default<T: Default>() -> T {
+            T::default()
+        }
+        let mut null: NullIo = make_default();
         let mut buf = [1u8; 4];
         assert_eq!(null.read(&mut buf).unwrap(), 0);
+        assert_eq!(
+            null.read_vectored(&mut [IoSliceMut::new(&mut buf)])
+                .unwrap(),
+            0
+        );
         assert_eq!(null.fill_buf().unwrap(), b"");
         null.consume(0);
         assert_eq!(null.write(b"abcd").unwrap(), 4);
@@ -1003,10 +998,13 @@ mod tests {
         );
         null.flush().unwrap();
         assert_eq!(null.seek(SeekFrom::Start(10)).unwrap(), 0);
+        assert_eq!(null.seek(SeekFrom::End(0)).unwrap(), 0);
         assert_eq!(null.stream_position().unwrap(), 0);
         assert!(null.seek(SeekFrom::Current(-1)).is_err());
+        assert!(null.seek(SeekFrom::End(-1)).is_err());
 
         let (r, w) = SplitIo::split(null).unwrap();
+        assert_eq!(NullIo::try_join(r, w).unwrap(), NullIo);
         assert_eq!(NullIo::join(r, w), NullIo);
     }
 
@@ -1022,8 +1020,11 @@ mod tests {
         assert_eq!(counter.count(), 0);
 
         let mut wrapped = WriteCounter::from(ShortIo::new(b""));
+        assert_eq!(wrapped.write(b"").unwrap(), 0);
         assert_eq!(wrapped.write(b"hello").unwrap(), 2);
         assert_eq!(wrapped.count(), 2);
+        assert_eq!(wrapped.as_writer().written, b"he");
+        assert_eq!(wrapped.as_ref().written, b"he");
         wrapped.as_writer_mut().fail_next = true;
         assert_eq!(
             wrapped.write(b"llo").unwrap_err().kind(),
@@ -1031,6 +1032,7 @@ mod tests {
         );
         assert_eq!(wrapped.count(), 2);
         wrapped.write_all(b"llo").unwrap();
+        wrapped.flush().unwrap();
         assert_eq!(wrapped.count(), 5);
         assert_eq!(wrapped.into_writer().written, b"hello");
     }
@@ -1153,5 +1155,451 @@ mod tests {
         let ok2 = IoCounter::<TcpStream>::join(r2, err.writer);
         assert_eq!(ok1.counts(), (7, 7));
         assert_eq!(ok2.counts(), (11, 22));
+    }
+
+    #[derive(Debug)]
+    struct FaultyIo {
+        buf: Vec<u8>,
+        report_read: Option<usize>,
+        report_write: Option<usize>,
+        fail_kind: Option<io::ErrorKind>,
+        fail_split: bool,
+    }
+
+    impl FaultyIo {
+        fn new(data: &[u8]) -> Self {
+            Self {
+                buf: data.to_vec(),
+                report_read: None,
+                report_write: None,
+                fail_kind: None,
+                fail_split: false,
+            }
+        }
+    }
+
+    impl Read for FaultyIo {
+        fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+            if let Some(kind) = self.fail_kind.take() {
+                return Err(io::Error::from(kind));
+            }
+            if let Some(n) = self.report_read.take() {
+                return Ok(n);
+            }
+            let n = out.len().min(self.buf.len());
+            out[..n].copy_from_slice(&self.buf[..n]);
+            self.buf.drain(..n);
+            Ok(n)
+        }
+
+        fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
+            if let Some(kind) = self.fail_kind.take() {
+                return Err(io::Error::from(kind));
+            }
+            if let Some(n) = self.report_read.take() {
+                return Ok(n);
+            }
+            let mut total = 0;
+            for slice in bufs {
+                let n = slice.len().min(self.buf.len());
+                slice[..n].copy_from_slice(&self.buf[..n]);
+                self.buf.drain(..n);
+                total += n;
+            }
+            Ok(total)
+        }
+    }
+
+    impl BufRead for FaultyIo {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if let Some(kind) = self.fail_kind.take() {
+                return Err(io::Error::from(kind));
+            }
+            Ok(&self.buf)
+        }
+
+        fn consume(&mut self, amt: usize) {
+            let n = amt.min(self.buf.len());
+            self.buf.drain(..n);
+        }
+    }
+
+    impl Write for FaultyIo {
+        fn write(&mut self, data: &[u8]) -> io::Result<usize> {
+            if let Some(kind) = self.fail_kind.take() {
+                return Err(io::Error::from(kind));
+            }
+            if let Some(n) = self.report_write.take() {
+                return Ok(n);
+            }
+            self.buf.extend_from_slice(data);
+            Ok(data.len())
+        }
+
+        fn write_vectored(&mut self, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
+            if let Some(kind) = self.fail_kind.take() {
+                return Err(io::Error::from(kind));
+            }
+            if let Some(n) = self.report_write.take() {
+                return Ok(n);
+            }
+            let mut total = 0;
+            for slice in bufs {
+                self.buf.extend_from_slice(slice);
+                total += slice.len();
+            }
+            Ok(total)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            if let Some(kind) = self.fail_kind.take() {
+                return Err(io::Error::from(kind));
+            }
+            Ok(())
+        }
+    }
+
+    impl SplitIo for FaultyIo {
+        type Reader = FaultyIo;
+        type Writer = FaultyIo;
+
+        fn split(self) -> Result<(Self::Reader, Self::Writer), SplitIoError<Self>> {
+            if self.fail_split {
+                return Err(SplitIoError {
+                    original: self,
+                    error: io::Error::from(io::ErrorKind::BrokenPipe),
+                });
+            }
+            Ok((Self::new(&self.buf), Self::new(&[])))
+        }
+
+        fn try_join(
+            reader: Self::Reader,
+            writer: Self::Writer,
+        ) -> Result<Self, JoinIoError<Self::Reader, Self::Writer>> {
+            let mut merged = reader.buf;
+            merged.extend_from_slice(&writer.buf);
+            Ok(Self::new(&merged))
+        }
+    }
+
+    #[test]
+    fn read_and_write_counter_accessors_malformed_inner_and_vectored_edges() {
+        let mut rc = ReadCounter::from(FaultyIo::new(b"abcdef"));
+        assert!(rc.is_empty());
+        assert_eq!(rc.as_reader().buf, b"abcdef");
+        assert_eq!(rc.as_ref().buf, b"abcdef");
+
+        // Empty read ok, error, and non-zero-on-empty-buffer violation on
+        // ReadCounter<FaultyIo>.
+        assert_eq!(rc.read(&mut []).unwrap(), 0);
+        rc.as_reader_mut().fail_kind = Some(io::ErrorKind::Other);
+        assert_eq!(rc.read(&mut []).unwrap_err().kind(), io::ErrorKind::Other);
+        rc.as_reader_mut().report_read = Some(1);
+        assert_eq!(
+            rc.read(&mut []).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+
+        // Over-reporting, error, overflow, and normal read + read_vectored on
+        // ReadCounter<FaultyIo>.
+        let mut two = [0u8; 2];
+        rc.as_reader_mut().fail_kind = Some(io::ErrorKind::Interrupted);
+        assert_eq!(
+            rc.read(&mut two).unwrap_err().kind(),
+            io::ErrorKind::Interrupted
+        );
+        rc.as_reader_mut().report_read = Some(5);
+        assert_eq!(
+            rc.read(&mut two).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        assert_eq!(rc.read(&mut two).unwrap(), 2);
+        assert_eq!(&two, b"ab");
+
+        rc.as_reader_mut().report_read = Some(5);
+        assert_eq!(
+            rc.read_vectored(&mut [IoSliceMut::new(&mut two)])
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidData
+        );
+        rc.as_reader_mut().fail_kind = Some(io::ErrorKind::TimedOut);
+        assert_eq!(
+            rc.read_vectored(&mut [IoSliceMut::new(&mut two)])
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::TimedOut
+        );
+
+        // Normal vectored read, empty vectored read, and near-MAX fallback on
+        // ReadCounter<FaultyIo>.
+        assert_eq!(rc.read_vectored(&mut []).unwrap(), 0);
+        let mut second = [0u8; 2];
+        assert_eq!(
+            rc.read_vectored(&mut [IoSliceMut::new(&mut two), IoSliceMut::new(&mut second)])
+                .unwrap(),
+            4
+        );
+        assert!(!rc.is_empty());
+        assert_eq!(rc.reset(), 6);
+        assert!(rc.is_empty());
+
+        rc.as_reader_mut().buf.extend_from_slice(b"123");
+        rc.count = usize::MAX - 1;
+        assert_eq!(
+            rc.read_vectored(&mut [IoSliceMut::new(&mut two)]).unwrap(),
+            1
+        );
+        assert_eq!(
+            rc.read(&mut two).unwrap_err().kind(),
+            io::ErrorKind::OutOfMemory
+        );
+
+        // BufRead: error, normal slice capping near usize::MAX, empty EOF,
+        // overflow.
+        let mut brc = ReadCounter::with_count(FaultyIo::new(b"xyz"), usize::MAX - 2);
+        brc.as_reader_mut().fail_kind = Some(io::ErrorKind::Interrupted);
+        assert_eq!(
+            brc.fill_buf().unwrap_err().kind(),
+            io::ErrorKind::Interrupted
+        );
+        assert_eq!(brc.fill_buf().unwrap(), b"xy");
+        brc.consume(5);
+        assert_eq!(brc.count(), usize::MAX);
+        assert_eq!(
+            brc.fill_buf().unwrap_err().kind(),
+            io::ErrorKind::OutOfMemory
+        );
+        assert_eq!(
+            brc.read_vectored(&mut [IoSliceMut::new(&mut two)])
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::OutOfMemory
+        );
+        let inner = brc.into_reader();
+        assert_eq!(inner.buf, b"z");
+
+        let mut empty_brc = ReadCounter::with_count(FaultyIo::new(b""), usize::MAX);
+        assert_eq!(empty_brc.fill_buf().unwrap(), b"");
+
+        // WriteCounter: all branches on WriteCounter<FaultyIo>.
+        let mut wc = WriteCounter::with(FaultyIo::new(b""));
+        assert_eq!(wc.write(b"").unwrap(), 0);
+        wc.as_writer_mut().fail_kind = Some(io::ErrorKind::Other);
+        assert_eq!(wc.write(b"").unwrap_err().kind(), io::ErrorKind::Other);
+        wc.as_writer_mut().report_write = Some(1);
+        assert_eq!(
+            wc.write(b"").unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        wc.as_writer_mut().fail_kind = Some(io::ErrorKind::WouldBlock);
+        assert_eq!(
+            wc.write(b"ab").unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        wc.as_writer_mut().report_write = Some(10);
+        assert_eq!(
+            wc.write(b"ab").unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        assert_eq!(wc.write(b"x").unwrap(), 1);
+        assert_eq!(wc.reset(), 1);
+        wc.as_writer_mut().buf.clear();
+        wc.as_writer_mut().report_write = Some(10);
+        assert_eq!(
+            wc.write_vectored(&[IoSlice::new(b"ab")])
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::InvalidData
+        );
+        wc.as_writer_mut().fail_kind = Some(io::ErrorKind::BrokenPipe);
+        assert_eq!(
+            wc.write_vectored(&[IoSlice::new(b"ab")])
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        wc.as_writer_mut().fail_kind = Some(io::ErrorKind::Other);
+        assert_eq!(wc.flush().unwrap_err().kind(), io::ErrorKind::Other);
+        wc.flush().unwrap();
+
+        assert_eq!(wc.write_vectored(&[]).unwrap(), 0);
+        assert_eq!(
+            wc.write_vectored(&[IoSlice::new(b"ab"), IoSlice::new(b"cd")])
+                .unwrap(),
+            4
+        );
+        let (wcount, w_inner) = wc.into_parts();
+        assert_eq!(wcount, 4);
+        assert_eq!(w_inner.buf, b"abcd");
+
+        let mut max_wc = WriteCounter::with_count(FaultyIo::new(b""), usize::MAX - 1);
+        assert_eq!(max_wc.write_vectored(&[IoSlice::new(b"ab")]).unwrap(), 1);
+        assert_eq!(
+            max_wc.write(b"a").unwrap_err().kind(),
+            io::ErrorKind::OutOfMemory
+        );
+        assert_eq!(
+            max_wc
+                .write_vectored(&[IoSlice::new(b"a")])
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::OutOfMemory
+        );
+    }
+
+    #[test]
+    fn io_counter_all_methods_bufread_split_error_and_fd_forwarding() {
+        let mut noop = IoCounter::default();
+        assert!(noop.is_empty());
+        assert_eq!(noop.write(b"hi").unwrap(), 2);
+        assert!(!noop.is_empty());
+        assert_eq!(noop.reset_write(), 2);
+        assert!(noop.is_empty());
+
+        let r_part = ReadCounter::with_count(Cursor::new(b"hello\nworld".to_vec()), 3);
+        let w_part = WriteCounter::with_count(Vec::<u8>::new(), 5);
+        let mut combined = IoCounter::from_counters(r_part, w_part);
+        assert_eq!(combined.counts(), (3, 5));
+        assert!(!combined.is_empty());
+        assert_eq!(combined.reset_read(), 3);
+        assert_eq!(combined.counts(), (0, 5));
+        assert_eq!(combined.reset(), (0, 5));
+        assert!(combined.is_empty());
+
+        let mut line = String::new();
+        combined.read_line(&mut line).unwrap();
+        assert_eq!(line, "hello\n");
+        let mut v1 = [0u8; 2];
+        let mut v2 = [0u8; 3];
+        assert_eq!(
+            combined
+                .read_vectored(&mut [IoSliceMut::new(&mut v1), IoSliceMut::new(&mut v2)])
+                .unwrap(),
+            5
+        );
+        assert_eq!(&v1, b"wo");
+        assert_eq!(&v2, b"rld");
+        assert_eq!(combined.fill_buf().unwrap(), b"");
+
+        assert_eq!(
+            combined
+                .write_vectored(&[IoSlice::new(b"aa"), IoSlice::new(b"bbb")])
+                .unwrap(),
+            5
+        );
+        combined.flush().unwrap();
+        assert_eq!(combined.as_stream().as_writer(), b"aabbb");
+        assert_eq!(combined.as_ref().as_writer(), b"aabbb");
+        combined.as_stream_mut().as_writer_mut().push(b'!');
+
+        let pair: IoPair<ReadCounter<_>, WriteCounter<_>> = combined.into();
+        let (rc, wc) = pair.into_parts();
+        assert_eq!(rc.count(), 11);
+        assert_eq!(wc.count(), 5);
+        let rebuilt = IoCounter::from_counters(rc, wc);
+        let (rc2, wc2) = rebuilt.into_counters();
+        assert_eq!(rc2.count(), 11);
+        assert_eq!(wc2.into_writer(), b"aabbb!");
+
+        // IoCounter BufRead overflow & error + split failure preservation.
+        let mut faulty = IoCounter::from(FaultyIo::new(b"abcd"));
+        faulty.read_count = usize::MAX - 1;
+        faulty.write_count = 9;
+        faulty.as_stream_mut().fail_kind = Some(io::ErrorKind::Other);
+        assert_eq!(faulty.fill_buf().unwrap_err().kind(), io::ErrorKind::Other);
+        assert_eq!(faulty.fill_buf().unwrap(), b"a");
+        faulty.consume(1);
+        assert_eq!(faulty.read_count(), usize::MAX);
+        assert_eq!(
+            faulty.fill_buf().unwrap_err().kind(),
+            io::ErrorKind::OutOfMemory
+        );
+
+        faulty.as_stream_mut().fail_split = true;
+        let split_err = SplitIo::split(faulty).unwrap_err();
+        assert_eq!(split_err.error.kind(), io::ErrorKind::BrokenPipe);
+        assert_eq!(split_err.original.counts(), (usize::MAX, 9));
+        let mut recovered = split_err.original;
+        recovered.as_stream_mut().buf.clear();
+        assert_eq!(recovered.fill_buf().unwrap(), b"");
+        recovered.as_stream_mut().buf.extend_from_slice(b"bcd");
+        recovered.as_stream_mut().fail_split = false;
+        let (sh_r, sh_w) = SplitIo::split(recovered).unwrap();
+        let rejoined = IoCounter::<FaultyIo>::join(sh_r, sh_w);
+        assert_eq!(rejoined.into_stream().buf, b"bcd");
+
+        #[cfg(any(unix, target_os = "wasi"))]
+        {
+            let (pr, pw) = io::pipe().unwrap();
+            let rc_fd = ReadCounter::with(pr);
+            let wc_fd = WriteCounter::with(pw);
+            assert!(rc_fd.as_fd().as_raw_fd() >= 0);
+            assert_eq!(rc_fd.as_raw_fd(), rc_fd.as_fd().as_raw_fd());
+            assert!(wc_fd.as_fd().as_raw_fd() >= 0);
+            assert_eq!(wc_fd.as_raw_fd(), wc_fd.as_fd().as_raw_fd());
+
+            let (u1, _u2) = std::os::unix::net::UnixStream::pair().unwrap();
+            let ic_fd = IoCounter::with(u1);
+            assert!(ic_fd.as_fd().as_raw_fd() >= 0);
+            assert_eq!(ic_fd.as_raw_fd(), ic_fd.as_fd().as_raw_fd());
+        }
+
+        // Exercise derived Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug
+        // on all counter types.
+        let n1 = NullIo;
+        let n2 = n1;
+        assert_eq!(n1, n2);
+        assert_eq!(n1.cmp(&n2), core::cmp::Ordering::Equal);
+        assert_eq!(n1.partial_cmp(&n2), Some(core::cmp::Ordering::Equal));
+        assert!(!format!("{n1:?}").is_empty());
+        let mut nset = HashSet::new();
+        assert!(nset.insert(n1));
+
+        let r1 = ReadCounter::with_count(vec![10u8], 1);
+        let r2 = r1.clone();
+        let r3 = ReadCounter::with_count(vec![10u8], 2);
+        let r4 = ReadCounter::with_count(vec![20u8], 1);
+        assert_eq!(r1, r2);
+        assert_ne!(r1, r3);
+        assert_ne!(r1, r4);
+        assert!(r1 < r3);
+        assert!(r1 < r4);
+        assert_eq!(r1.cmp(&r2), core::cmp::Ordering::Equal);
+        assert!(!format!("{r1:?}").is_empty());
+        let mut rset = HashSet::new();
+        assert!(rset.insert(r1));
+
+        let w1 = WriteCounter::with_count(vec![10u8], 1);
+        let w2 = w1.clone();
+        let w3 = WriteCounter::with_count(vec![10u8], 2);
+        let w4 = WriteCounter::with_count(vec![20u8], 1);
+        assert_eq!(w1, w2);
+        assert_ne!(w1, w3);
+        assert_ne!(w1, w4);
+        assert!(w1 < w3);
+        assert!(w1 < w4);
+        assert_eq!(w1.cmp(&w2), core::cmp::Ordering::Equal);
+        assert!(!format!("{w1:?}").is_empty());
+        let mut wset = HashSet::new();
+        assert!(wset.insert(w1));
+
+        let i1 = IoCounter::with_counts(vec![10u8], 1, 2);
+        let i2 = i1.clone();
+        let i3 = IoCounter::with_counts(vec![10u8], 2, 2);
+        let i4 = IoCounter::with_counts(vec![10u8], 1, 3);
+        let i5 = IoCounter::with_counts(vec![20u8], 1, 2);
+        assert_eq!(i1, i2);
+        assert_ne!(i1, i3);
+        assert_ne!(i1, i4);
+        assert_ne!(i1, i5);
+        assert!(i1 < i3);
+        assert!(i1 < i4);
+        assert!(i1 < i5);
+        assert_eq!(i1.cmp(&i2), core::cmp::Ordering::Equal);
+        assert!(!format!("{i1:?}").is_empty());
+        let mut iset = HashSet::new();
+        assert!(iset.insert(i1));
     }
 }

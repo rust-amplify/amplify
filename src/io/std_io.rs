@@ -93,15 +93,13 @@ impl Hash for IoError {
 
 impl Display for IoError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let err = io::Error::from(self.clone());
-        Display::fmt(&err, f)
+        f.write_str(&self.display)
     }
 }
 
 impl Debug for IoError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let err = io::Error::from(self.clone());
-        Debug::fmt(&err, f)
+        f.write_str(&self.debug)
     }
 }
 
@@ -135,5 +133,49 @@ impl From<IoError> for io::Error {
             Some(details) => io::Error::new(err.kind, details),
             None => io::Error::from(err.kind),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn io_error_traits_formatting_and_conversions() {
+        let from_kind = IoError::from(io::ErrorKind::NotFound);
+        assert_eq!(from_kind.kind(), io::ErrorKind::NotFound);
+        assert!(from_kind.source().is_none());
+
+        let detailed = IoError::from(io::Error::other("alpha"));
+        let detailed_same = IoError::from(io::Error::other("alpha"));
+        let detailed_diff = IoError::from(io::Error::other("beta"));
+        let cloned = detailed.clone();
+
+        assert_eq!(detailed, detailed_same);
+        assert_eq!(detailed, cloned);
+        assert_ne!(detailed, detailed_diff);
+        assert_ne!(detailed, from_kind);
+
+        assert_eq!(detailed.partial_cmp(&detailed_same), Some(Ordering::Equal));
+        assert_eq!(detailed.cmp(&detailed_diff), Ordering::Less);
+        assert_ne!(from_kind.cmp(&detailed), Ordering::Equal);
+
+        let mut set = HashSet::new();
+        assert!(set.insert(detailed_same));
+        assert!(!set.insert(cloned.clone()));
+        assert!(set.insert(from_kind.clone()));
+
+        assert!(format!("{detailed}").contains("alpha"));
+        assert!(format!("{detailed:?}").contains("alpha"));
+
+        let recovered_detailed: io::Error = detailed.into();
+        assert_eq!(recovered_detailed.kind(), io::ErrorKind::Other);
+        assert_eq!(recovered_detailed.to_string(), "alpha");
+
+        let recovered_none: io::Error = cloned.into();
+        assert_eq!(recovered_none.kind(), io::ErrorKind::Other);
+        assert!(recovered_none.get_ref().is_none());
     }
 }

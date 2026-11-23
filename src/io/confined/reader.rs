@@ -421,12 +421,9 @@ impl<R: io::Read, const MIN: usize, const MAX: usize> io::Read for ConfinedReade
     }
 
     fn read_vectored(&mut self, bufs: &mut [io::IoSliceMut<'_>]) -> io::Result<usize> {
-        let total = bufs
-            .iter()
-            .try_fold(0usize, |acc, s| acc.checked_add(s.len()));
-        if total == Some(0) {
+        let Some(first_idx) = bufs.iter().position(|s| !s.is_empty()) else {
             return Ok(0);
-        }
+        };
         let remaining = MAX - self.count;
         if remaining == 0 {
             return Err(ConfinedIoError::Oversize {
@@ -435,33 +432,29 @@ impl<R: io::Read, const MIN: usize, const MAX: usize> io::Read for ConfinedReade
             }
             .into());
         }
-        if let Some(total) = total {
-            if total <= remaining {
-                let read = self.reader.read_vectored(bufs)?;
-                if read > total {
-                    return Err(ConfinedIoError::Oversize {
-                        count: self.count.saturating_add(read),
-                        max: MAX,
-                    }
-                    .into());
+        let total = bufs[first_idx..]
+            .iter()
+            .fold(0usize, |acc, s| acc.saturating_add(s.len()));
+        if total <= remaining {
+            let read = self.reader.read_vectored(bufs)?;
+            if read > total {
+                return Err(ConfinedIoError::Oversize {
+                    count: self.count.saturating_add(read),
+                    max: MAX,
                 }
-                if read == 0 && self.count < MIN {
-                    return Err(ConfinedIoError::Undersize {
-                        count: self.count,
-                        min: MIN,
-                    }
-                    .into());
+                .into());
+            }
+            if read == 0 && self.count < MIN {
+                return Err(ConfinedIoError::Undersize {
+                    count: self.count,
+                    min: MIN,
                 }
-                self.count += read;
-                return Ok(read);
+                .into());
             }
+            self.count += read;
+            return Ok(read);
         }
-        for slice in bufs {
-            if !slice.is_empty() {
-                return self.read(slice);
-            }
-        }
-        Ok(0)
+        self.read(&mut bufs[first_idx])
     }
 
     fn read_exact(&mut self, mut buf: &mut [u8]) -> io::Result<()> {
@@ -511,8 +504,6 @@ impl<R: io::Read, const MIN: usize, const MAX: usize> io::Read for ConfinedReade
                 }
                 return Ok(appended);
             }
-            buf.try_reserve(read)
-                .map_err(|_| io::Error::from(io::ErrorKind::OutOfMemory))?;
             buf.extend_from_slice(&chunk[..read]);
             self.count += read;
             appended += read;
@@ -540,8 +531,6 @@ impl<R: io::Read, const MIN: usize, const MAX: usize> io::Read for ConfinedReade
         if buf.is_empty() {
             *buf = text;
         } else {
-            buf.try_reserve(text.len())
-                .map_err(|_| io::Error::from(io::ErrorKind::OutOfMemory))?;
             buf.push_str(&text);
         }
         Ok(read)
